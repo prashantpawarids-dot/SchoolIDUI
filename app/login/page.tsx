@@ -95,7 +95,7 @@ localStorage.setItem("roleId", data.roleId.toString());
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-primary/5 via-background to-accent/5 p-4">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-5xl">
         {/* Branding */}
-        <div className="hidden lg:flex flex-col justify-center items-center space-y-8">
+        {/* <div className="hidden lg:flex flex-col justify-center items-center space-y-8">
           <Image
             src={LogoImage}
             alt="Logo"
@@ -111,7 +111,27 @@ localStorage.setItem("roleId", data.roleId.toString());
               ID Card Management System
             </p>
           </div>
-        </div>
+        </div> */}
+
+        {/* Branding - visible on all screen sizes */}
+<div className="flex flex-col justify-center items-center space-y-8">
+  <Image
+    src={LogoImage}
+    alt="Logo"
+    width={180}
+    height={180}
+    className="object-contain rounded-xl border-0 border-gray-300"
+  />
+  <div className="text-center space-y-4">
+    <h1 className="text-4xl font-bold text-primary">
+      IDS ID SMART TECH
+    </h1>
+    <p className="text-xl text-muted-foreground">
+      ID Card Management System
+    </p>
+  </div>
+</div>
+
 
         {/* Login Form */}
         <div className="flex items-center justify-center">
