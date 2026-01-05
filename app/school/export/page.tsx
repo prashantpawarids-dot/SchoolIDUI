@@ -93,62 +93,9 @@ export default function ExportData() {
   const [exportingType, setExportingType] = useState<ExportType | null>(null);
   const [exportSuccess, setExportSuccess] = useState<ExportType | null>(null);
 
-  /* =======================
-     INITIAL LOAD
-  // ======================= */
-  // useEffect(() => {
-  //   // Fetch schools
-  //   fetch("https://localhost:7135/api/School/list")
-  //     .then((res) => res.json())
-  //     .then(setSchools)
-  //     .catch((err) => console.error("Error fetching schools:", err));
+// const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = "/api/proxy";
 
-  //   // Fetch all students
-  //   fetch("https://localhost:7135/api/Student/getall")
-  //     .then((res) => res.json())
-  //     .then(async (studentsData: Student[]) => {
-  //       setStudents(studentsData);
-
-  //       // Fetch statuses for all students
-  //       const statusMap: Record<number, string> = {};
-
-  //       await Promise.all(
-  //         studentsData.map(async (s: Student) => {
-  //           if (!s.studentId) {
-  //             console.warn("Skipping student with missing studentId:", s);
-  //             return;
-  //           }
-
-  //           try {
-  //             const res = await fetch(
-  //               `https://localhost:7135/api/Student/applications/student/${s.studentId}`
-  //             );
-  //             if (!res.ok) {
-  //               console.warn(
-  //                 "Failed to fetch status for studentId",
-  //                 s.studentId
-  //               );
-  //               statusMap[s.studentId] = "";
-  //               return;
-  //             }
-
-  //             const data = await res.json();
-  //             statusMap[s.studentId] = data[0]?.status ?? "";
-  //           } catch (err) {
-  //             console.error(
-  //               "Error fetching status for studentId",
-  //               s.studentId,
-  //               err
-  //             );
-  //             statusMap[s.studentId] = "";
-  //           }
-  //         })
-  //       );
-
-  //       setStudentStatuses(statusMap);
-  //     })
-  //     .catch((err) => console.error("Error fetching students:", err));
-  // }, []);
 useEffect(() => {
   const schoolId =
     typeof window !== "undefined"
@@ -158,7 +105,7 @@ useEffect(() => {
   if (!schoolId) return;
 
   // Fetch logged-in school only
-  fetch("https://localhost:7135/api/School/list")
+  fetch(`${API_BASE_URL}/School/list`)
     .then((res) => res.json())
     .then((data: School[]) => {
       const filteredSchool = data.filter((s) => s.schoolId === schoolId);
@@ -167,7 +114,7 @@ useEffect(() => {
     .catch((err) => console.error("Error fetching schools:", err));
 
   // Fetch all students for the logged-in school only
-  fetch("https://localhost:7135/api/Student/getall")
+  fetch(`${API_BASE_URL}/Student/getall`)
     .then((res) => res.json())
     .then(async (studentsData: Student[]) => {
       // Filter students by logged-in school
@@ -186,7 +133,7 @@ useEffect(() => {
 
           try {
             const res = await fetch(
-              `https://localhost:7135/api/Student/applications/student/${s.studentId}`
+              `${API_BASE_URL}/Student/applications/student/${s.studentId}`
             );
             if (!res.ok) {
               console.warn(
@@ -220,12 +167,12 @@ useEffect(() => {
   ======================= */
   useEffect(() => {
     if (selectedSchool !== "all") {
-      fetch(`https://localhost:7135/api/School/academicyear/${selectedSchool}`)
+      fetch(`${API_BASE_URL}/School/academicyear/${selectedSchool}`)
         .then((res) => res.json())
         .then(setAcademicYears);
 
       fetch(
-        `https://localhost:7135/api/ClassDivision/getclasses?schoolId=${selectedSchool}`
+        `${API_BASE_URL}/ClassDivision/getclasses?schoolId=${selectedSchool}`
       )
         .then((res) => res.json())
         .then(setClasses);
@@ -239,7 +186,7 @@ useEffect(() => {
   useEffect(() => {
     if (selectedClass !== "all") {
       fetch(
-        `https://localhost:7135/api/ClassDivision/getdivisions?classId=${selectedClass}`
+        `${API_BASE_URL}/ClassDivision/getdivisions?classId=${selectedClass}`
       )
         .then((res) => res.json())
         .then(setDivisions);

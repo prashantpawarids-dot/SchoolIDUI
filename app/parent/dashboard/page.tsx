@@ -63,6 +63,8 @@ export default function ParentDashboard() {
   const [students, setStudents] = useState<ParentStudent[]>([]);
   const [parentUserId, setParentUserId] = useState<number | null>(null);
   const [schoolId, setSchoolId] = useState<number | null>(null);
+// const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = "/api/proxy";
 
   useEffect(() => {
     const userId = localStorage.getItem("userId");
@@ -77,14 +79,14 @@ export default function ParentDashboard() {
     const fetchStudents = async () => {
       try {
         const res = await fetch(
-          `https://localhost:7135/api/Student/getbyparent/${parentUserId}`
+          `${API_BASE_URL}/Student/getbyparent/${parentUserId}`
         );
         const data = await res.json();
 
         const studentsWithStatus: ParentStudent[] = await Promise.all(
           data.map(async (student: any) => {
             const appRes = await fetch(
-              `https://localhost:7135/api/Student/applications/student/${student.studentId}`
+              `${API_BASE_URL}/Student/applications/student/${student.studentId}`
             );
             const applications = await appRes.json();
             const latestApp = applications[0] || {};

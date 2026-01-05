@@ -70,105 +70,12 @@ export default function ManageStudents() {
   const [rejectionReason, setRejectionReason] = useState("");
 
 
-  // // Fetch schools
-  // useEffect(() => {
-  //   fetch("https://localhost:7135/api/School/list")
-  //     .then((res) => res.json())
-  //     .then(setSchools);
-  // }, []);
-
-  // // Fetch academic years when school changes
-  // useEffect(() => {
-  //   if (selectedSchool !== "all") {
-  //     fetch(`https://localhost:7135/api/School/academicyear/${selectedSchool}`)
-  //       .then((res) => res.json())
-  //       .then((data: AcademicYear[]) => {
-  //         setAcademicYears(data);
-  //         setSelectedYear("all");
-  //       });
-  //   } else {
-  //     setAcademicYears([]);
-  //     setSelectedYear("all");
-  //   }
-  // }, [selectedSchool]);
-
-  // // Fetch classes when school changes
-  // useEffect(() => {
-  //   if (selectedSchool !== "all") {
-  //     fetch(
-  //       `https://localhost:7135/api/ClassDivision/getclasses?schoolId=${selectedSchool}`
-  //     )
-  //       .then((res) => res.json())
-  //       .then((data: Class[]) => {
-  //         setClasses(data);
-  //         setSelectedClass("all");
-  //         setDivisions([]);
-  //         setSelectedDivision("all");
-  //       });
-  //   } else {
-  //     setClasses([]);
-  //     setSelectedClass("all");
-  //     setDivisions([]);
-  //     setSelectedDivision("all");
-  //   }
-  // }, [selectedSchool]);
-
-  // // Fetch divisions when class changes
-  // useEffect(() => {
-  //   if (selectedClass !== "all") {
-  //     fetch(
-  //       `https://localhost:7135/api/ClassDivision/getdivisions?classId=${selectedClass}`
-  //     )
-  //       .then((res) => res.json())
-  //       .then((data: Division[]) => {
-  //         setDivisions(data);
-  //         setSelectedDivision("all");
-  //       });
-  //   } else {
-  //     setDivisions([]);
-  //     setSelectedDivision("all");
-  //   }
-  // }, [selectedClass]);
-
-  // // Fetch students with application status
-  // useEffect(() => {
-  //   fetch("https://localhost:7135/api/Student/getall")
-  //     .then((res) => res.json())
-  //     .then(async (data: any) => {
-  //       const transformed: Student[] = await Promise.all(
-  //         data.map(async (s: any) => {
-  //           const appRes = await fetch(
-  //             `https://localhost:7135/api/Student/applications/student/${s.studentId}`
-  //           );
-  //           const appData = await appRes.json();
-  //           const status =
-  //             appData.length > 0
-  //               ? appData[0].status === "accept"
-  //                 ? "Approved"
-  //                 : appData[0].status === "reject"
-  //                 ? "Rejected"
-  //                 : "Pending"
-  //               : "Pending";
-  //           return {
-  //             studentId: s.studentId,
-  //             fullName: s.fullName,
-  //             rollNo: s.rollNo,
-  //             className: s.className,
-  //             divisionName: s.divisionName,
-  //             schoolName: s.schoolName,
-  //             academicYear: s.academicYear,
-  //             status,
-  //             photoPath: s.photoPath,
-  //           };
-  //         })
-  //       );
-  //       setStudents(transformed);
-  //     });
-  // }, []);
+  
 
 
 
-  const BASE_URL = "https://localhost:7135/api";
+  // const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const BASE_URL = "/api/proxy";
 
 const schoolId =
   typeof window !== "undefined"
@@ -331,7 +238,7 @@ useEffect(() => {
     const encodedRemarks = encodeURIComponent(rejectionReason);
 
     // Construct the full URL
-    const url = `https://localhost:7135/api/Student/applications/update/${student.studentId}?status=${status}&remarks=${encodedRemarks}`;
+    const url = `${BASE_URL}/Student/applications/update/${student.studentId}?status=${status}&remarks=${encodedRemarks}`;
 
     fetch(url, {
       method: "PUT",

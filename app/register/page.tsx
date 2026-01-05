@@ -27,41 +27,43 @@ export default function RegisterPage() {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [credentials, setCredentials] = useState<{ username: string; password: string } | null>(null) // <-- For showing credentials card
-
+// const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const API_BASE = "/api/proxy";
   // Fetch schools
-  useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/School/list`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch schools");
-        return res.json();
-      })
-      .then((data) => setSchools(data))
-      .catch((err) => console.error(err.message));
-  }, []);
+useEffect(() => {
+  fetch(`${API_BASE}/School/list`)
+    .then((res) => {
+      if (!res.ok) throw new Error("Failed to fetch schools");
+      return res.json();
+    })
+    .then((data) => setSchools(data))
+    .catch((err) => console.error(err.message));
+}, []);
 
-  // Fetch roles
-  useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/Auth/roles`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch roles");
-        return res.json();
-      })
-      .then((data) => setRoles(data))
-      .catch((err) => console.error(err.message));
-  }, []);
+// Fetch roles
+useEffect(() => {
+  fetch(`${API_BASE}/Auth/roles`)
+    .then((res) => {
+      if (!res.ok) throw new Error("Failed to fetch roles");
+      return res.json();
+    })
+    .then((data) => setRoles(data))
+    .catch((err) => console.error(err.message));
+}, []);
 
-  // Fetch academic years when school changes
-  useEffect(() => {
-    if (!formData.schoolId) return;
+// Fetch academic years when school changes
+useEffect(() => {
+  if (!formData.schoolId) return;
 
-    fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/School/academicyear/${formData.schoolId}`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch academic years");
-        return res.json();
-      })
-      .then((data) => setAcademicYears(data))
-      .catch((err) => console.error(err.message));
-  }, [formData.schoolId]);
+  fetch(`${API_BASE}/School/academicyear/${formData.schoolId}`)
+    .then((res) => {
+      if (!res.ok) throw new Error("Failed to fetch academic years");
+      return res.json();
+    })
+    .then((data) => setAcademicYears(data))
+    .catch((err) => console.error(err.message));
+}, [formData.schoolId]);
+
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));

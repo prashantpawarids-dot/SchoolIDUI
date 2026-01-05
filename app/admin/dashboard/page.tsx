@@ -25,7 +25,10 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-const BASE_URL = "https://localhost:7135/api";
+// const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const BASE_URL ="/api/proxy";
+
+
 
 export default function AdminDashboard() {
   const [totalStudents, setTotalStudents] = useState(0);
@@ -38,6 +41,7 @@ export default function AdminDashboard() {
     // Fetch all students
     fetch(`${BASE_URL}/Student/getall`)
       .then((res) => res.json())
+      
       .then(async (students: any[]) => {
         setTotalStudents(students.length);
 

@@ -11,7 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Search, Eye, Users, BookOpen, GraduationCap, Filter, User, Phone, MapPin, Droplet, Calendar } from "lucide-react"
 import type { Student, Class } from "@/lib/types"
 
-const BASE_URL = "https://localhost:7135/api"
+
+
+// const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const BASE_URL = "/api/proxy";
+
+
 
 export default function PartnerDashboard() {
   const [students, setStudents] = useState<Student[]>([])

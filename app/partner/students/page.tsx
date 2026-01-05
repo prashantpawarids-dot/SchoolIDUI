@@ -68,7 +68,8 @@ export default function PartnerStudentsPage() {
 
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
-const BASE_URL = "https://localhost:7135/api/";
+// const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const BASE_URL = "/api/proxy";
 
   // Fetch schools
 useEffect(() => {

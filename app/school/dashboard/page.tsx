@@ -25,8 +25,9 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-const BASE_URL = "https://localhost:7135/api";
+// const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
+const BASE_URL = "/api/proxy";
 export default function AdminDashboard() {
   const [totalStudents, setTotalStudents] = useState(0);
   const [totalParents, setTotalParents] = useState(0);
@@ -34,71 +35,7 @@ export default function AdminDashboard() {
   const [totalSchools, setTotalSchools] = useState(0);
   const [recentStudents, setRecentStudents] = useState<any[]>([]);
 
-  // useEffect(() => {
-  //   // Fetch all students
-  //   fetch(`${BASE_URL}/Student/getall`)
-  //     .then((res) => res.json())
-  //     .then(async (students: any[]) => {
-  //       setTotalStudents(students.length);
-
-  //       const pendingStudents: any[] = [];
-
-  //       for (const s of students) {
-  //         const appRes = await fetch(
-  //           `${BASE_URL}/Student/applications/student/${s.studentId}`
-  //         );
-  //         const appData = await appRes.json();
-
-  //         // Only include pending applications
-  //         if (
-  //           appData.length > 0 &&
-  //           appData[0].status !== "accept" &&
-  //           appData[0].status !== "reject"
-  //         ) {
-  //           pendingStudents.push({
-  //             studentId: s.studentId,
-  //             fullName: s.fullName,
-  //             className: s.className,
-  //             divisionName: s.divisionName,
-  //             status: "Pending",
-  //             createdOn: new Date(appData[0].createdOn),
-  //             firstName: s.firstName,
-  //             lastName: s.lastName,
-  //           });
-  //         }
-  //       }
-
-  //       // Sort by createdOn descending (latest first)
-  //       pendingStudents.sort(
-  //         (a, b) => b.createdOn.getTime() - a.createdOn.getTime()
-  //       );
-
-  //       // Take top 5 for dashboard
-  //       setRecentStudents(pendingStudents.slice(0, 5));
-  //     })
-  //     .catch((err) => console.error(err));
-
-  //   // Fetch all users and filter parents
-  //   fetch(`${BASE_URL}/Auth/users`)
-  //     .then((res) => res.json())
-  //     .then((data) => {
-  //       const parents = data.filter((u: any) => u.roleId === 2);
-  //       setTotalParents(parents.length);
-  //     })
-  //     .catch((err) => console.error(err));
-
-  //   // Fetch all classes
-  //   fetch(`${BASE_URL}/ClassDivision/getclasses`)
-  //     .then((res) => res.json())
-  //     .then((data) => setTotalClasses(data.length))
-  //     .catch((err) => console.error(err));
-
-  //   // Fetch all schools
-  //   fetch(`${BASE_URL}/School/list`)
-  //     .then((res) => res.json())
-  //     .then((data) => setTotalSchools(data.length))
-  //     .catch((err) => console.error(err));
-  // }, []);
+  
 useEffect(() => {
   const schoolId = Number(localStorage.getItem("schoolId"));
   if (!schoolId) return;

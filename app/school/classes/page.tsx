@@ -47,7 +47,8 @@ import { Plus, Edit2, Trash2, BookOpen, Layers } from "lucide-react";
 import type { Class, Division, School, AcademicYear } from "@/lib/types";
 
 export default function ManageClasses() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
+  // const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const API_BASE = "/api/proxy";
 
   const [schools, setSchools] = useState<School[]>([]);
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);

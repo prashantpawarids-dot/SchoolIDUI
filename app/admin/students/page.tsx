@@ -68,10 +68,12 @@ export default function ManageStudents() {
 
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+// const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE_URL = "/api/proxy";
 
   // Fetch schools
   useEffect(() => {
-    fetch("https://localhost:7135/api/School/list")
+    fetch(`${API_BASE_URL}/School/list`)
       .then((res) => res.json())
       .then(setSchools);
   }, []);
@@ -79,7 +81,7 @@ export default function ManageStudents() {
   // Fetch academic years when school changes
   useEffect(() => {
     if (selectedSchool !== "all") {
-      fetch(`https://localhost:7135/api/School/academicyear/${selectedSchool}`)
+      fetch(`${API_BASE_URL}/School/academicyear/${selectedSchool}`)
         .then((res) => res.json())
         .then((data: AcademicYear[]) => {
           setAcademicYears(data);
@@ -95,7 +97,7 @@ export default function ManageStudents() {
   useEffect(() => {
     if (selectedSchool !== "all") {
       fetch(
-        `https://localhost:7135/api/ClassDivision/getclasses?schoolId=${selectedSchool}`
+        `${API_BASE_URL}/ClassDivision/getclasses?schoolId=${selectedSchool}`
       )
         .then((res) => res.json())
         .then((data: Class[]) => {
@@ -116,7 +118,7 @@ export default function ManageStudents() {
   useEffect(() => {
     if (selectedClass !== "all") {
       fetch(
-        `https://localhost:7135/api/ClassDivision/getdivisions?classId=${selectedClass}`
+        `${API_BASE_URL}/ClassDivision/getdivisions?classId=${selectedClass}`
       )
         .then((res) => res.json())
         .then((data: Division[]) => {
@@ -131,13 +133,13 @@ export default function ManageStudents() {
 
   // Fetch students with application status
   useEffect(() => {
-    fetch("https://localhost:7135/api/Student/getall")
+    fetch(`${API_BASE_URL}/Student/getall`)
       .then((res) => res.json())
       .then(async (data: any) => {
         const transformed: Student[] = await Promise.all(
           data.map(async (s: any) => {
             const appRes = await fetch(
-              `https://localhost:7135/api/Student/applications/student/${s.studentId}`
+              `${API_BASE_URL}/Student/applications/student/${s.studentId}`
             );
             const appData = await appRes.json();
             const status =
@@ -206,7 +208,7 @@ export default function ManageStudents() {
     const encodedRemarks = encodeURIComponent(rejectionReason);
 
     // Construct the full URL
-    const url = `https://localhost:7135/api/Student/applications/update/${student.studentId}?status=${status}&remarks=${encodedRemarks}`;
+    const url = `${API_BASE_URL}/Student/applications/update/${student.studentId}?status=${status}&remarks=${encodedRemarks}`;
 
     fetch(url, {
       method: "PUT",

@@ -40,7 +40,8 @@ export default function AddStudentPage() {
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [divisions, setDivisions] = useState<any[]>([]);
-
+  // const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL
+const BASE_URL = "/api/proxy";
   const [formData, setFormData] = useState({
     firstName: "",
     middleName: "",
@@ -59,52 +60,94 @@ export default function AddStudentPage() {
       .trim()
       .replace(/\s+/g, " ");
 
-  useEffect(() => {
-    const schoolId = localStorage.getItem("schoolId");
-if (!schoolId) {
+//   useEffect(() => {
+//     const schoolId = localStorage.getItem("schoolId");
+// if (!schoolId) {
+//     console.error("schoolId not found in localStorage");
+//     return;
+//   }
+
+//     const fetchAcademicYears = async () => {
+//       const res = await fetch(
+//         `${process.env.NEXT_PUBLIC_API_BASE_URL}/School/academicyear/${schoolId}`
+//       );
+//       const data = await res.json();
+//       setAcademicYears(data);
+//     };
+
+//     const fetchClasses = async () => {
+//       const res = await fetch(
+//         `${process.env.NEXT_PUBLIC_API_BASE_URL}/ClassDivision/getclasses?schoolId=${schoolId}`
+//       );
+//       const data = await res.json();
+//       setClasses(data);
+//     };
+
+//     fetchAcademicYears();
+//     fetchClasses();
+//   }, []);
+
+//   useEffect(() => {
+//     const fetchDivisions = async () => {
+//       const res = await fetch(
+//         `${process.env.NEXT_PUBLIC_API_BASE_URL}/ClassDivision/getdivisions`
+//       );
+//       const data = await res.json();
+//       setDivisions(data); // store all divisions
+//     };
+
+//     fetchDivisions();
+//   }, []);
+
+//   const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+//     const file = e.target.files?.[0];
+//     if (file) {
+//       setSelectedFile(file);
+//       setShowCropper(true);
+//     }
+//   };
+
+
+useEffect(() => {
+  const schoolId = localStorage.getItem("schoolId");
+  if (!schoolId) {
     console.error("schoolId not found in localStorage");
     return;
   }
 
-    const fetchAcademicYears = async () => {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/School/academicyear/${schoolId}`
-      );
-      const data = await res.json();
-      setAcademicYears(data);
-    };
-
-    const fetchClasses = async () => {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/ClassDivision/getclasses?schoolId=${schoolId}`
-      );
-      const data = await res.json();
-      setClasses(data);
-    };
-
-    fetchAcademicYears();
-    fetchClasses();
-  }, []);
-
-  useEffect(() => {
-    const fetchDivisions = async () => {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/ClassDivision/getdivisions`
-      );
-      const data = await res.json();
-      setDivisions(data); // store all divisions
-    };
-
-    fetchDivisions();
-  }, []);
-
-  const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setShowCropper(true);
-    }
+  const fetchAcademicYears = async () => {
+    const res = await fetch(`${BASE_URL}/School/academicyear/${schoolId}`);
+    const data = await res.json();
+    setAcademicYears(data);
   };
+
+  const fetchClasses = async () => {
+    const res = await fetch(`${BASE_URL}/ClassDivision/getclasses?schoolId=${schoolId}`);
+    const data = await res.json();
+    setClasses(data);
+  };
+
+  fetchAcademicYears();
+  fetchClasses();
+}, []);
+
+useEffect(() => {
+  const fetchDivisions = async () => {
+    const res = await fetch(`${BASE_URL}/ClassDivision/getdivisions`);
+    const data = await res.json();
+    setDivisions(data); // store all divisions
+  };
+
+  fetchDivisions();
+}, []);
+
+const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (file) {
+    setSelectedFile(file);
+    setShowCropper(true);
+  }
+};
 
   const onCapture = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
