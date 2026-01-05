@@ -198,15 +198,26 @@ export function Sidebar({ role }: SidebarProps) {
   return (
     <aside className="w-64 bg-card border-r border-border h-screen overflow-y-auto flex flex-col">
       <div className="p-6">
-        <div className="w-20 h-20 flex items-center justify-center mb-3">
+        {/* <div className="w-20 h-20 flex items-center justify-center mb-3">
           <Image
             src={LogoImage}
             alt="Logo"
             width={100}
             height={100}
-            className="object-contain rounded-xl border-2 border-gray-300"
+            className="object-contain rounded-xl border-2 border-gray-0"
           />
-        </div>
+        </div> */}
+
+        <div className="w-20 h-20 flex items-center justify-center mb-3">
+  <Image
+    src={LogoImage}
+    alt="Logo"
+    width={100}
+    height={100}
+    className="object-contain rounded-xl"
+  />
+</div>
+
 
         <div className="space-y-1">
           <h2 className="font-bold text-lg text-foreground">

@@ -73,7 +73,7 @@ const BASE_URL = "/api/proxy";
 
   // Fetch schools
 useEffect(() => {
-  fetch(`${BASE_URL}School/list`)
+  fetch(`${BASE_URL}/School/list`)
     .then((res) => res.json())
     .then(setSchools);
 }, []);
@@ -81,7 +81,7 @@ useEffect(() => {
 // Fetch academic years
 useEffect(() => {
   if (selectedSchool !== "all") {
-    fetch(`${BASE_URL}School/academicyear/${selectedSchool}`)
+    fetch(`${BASE_URL}/School/academicyear/${selectedSchool}`)
       .then((res) => res.json())
       .then((data: AcademicYear[]) => {
         setAcademicYears(data);
@@ -96,7 +96,7 @@ useEffect(() => {
 // Fetch classes
 useEffect(() => {
   if (selectedSchool !== "all") {
-    fetch(`${BASE_URL}ClassDivision/getclasses?schoolId=${selectedSchool}`)
+    fetch(`${BASE_URL}/ClassDivision/getclasses?schoolId=${selectedSchool}`)
       .then((res) => res.json())
       .then((data: Class[]) => {
         setClasses(data);
@@ -115,7 +115,7 @@ useEffect(() => {
 // Fetch divisions
 useEffect(() => {
   if (selectedClass !== "all") {
-    fetch(`${BASE_URL}ClassDivision/getdivisions?classId=${selectedClass}`)
+    fetch(`${BASE_URL}/ClassDivision/getdivisions?classId=${selectedClass}`)
       .then((res) => res.json())
       .then((data: Division[]) => {
         setDivisions(data);
@@ -129,13 +129,13 @@ useEffect(() => {
 
 // Fetch students
 useEffect(() => {
-  fetch(`${BASE_URL}Student/getall`)
+  fetch(`${BASE_URL}/Student/getall`)
     .then((res) => res.json())
     .then(async (data: any) => {
       const transformed: Student[] = await Promise.all(
         data.map(async (s: any) => {
           const appRes = await fetch(
-            `${BASE_URL}Student/applications/student/${s.studentId}`
+            `${BASE_URL}/Student/applications/student/${s.studentId}`
           );
           const appData = await appRes.json();
           const status =
@@ -169,7 +169,7 @@ const handleApproveReject = (
   status: "accept" | "reject"
 ) => {
   const encodedRemarks = encodeURIComponent(rejectionReason);
-  const url = `${BASE_URL}Student/applications/update/${student.studentId}?status=${status}&remarks=${encodedRemarks}`;
+  const url = `${BASE_URL}/Student/applications/update/${student.studentId}?status=${status}&remarks=${encodedRemarks}`;
 
   fetch(url, { method: "PUT" })
     .then((res) => {

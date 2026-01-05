@@ -91,7 +91,7 @@ export default function PartnerDashboard() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Partner Dashboard" description="View and access student information" />
+      <PageHeader title="Patner Dashboard" description="View and access student information" />
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

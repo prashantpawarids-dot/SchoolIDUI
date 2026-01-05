@@ -357,7 +357,7 @@ const BASE_URL = "/api/proxy";
       <div className="h-16 px-6 flex items-center justify-between">
         {/* Logo / School */}
         <div className="flex items-center gap-3">
-          <div className="w-20 h-20 flex items-center justify-center mb-0">
+          {/* <div className="w-20 h-20 flex items-center justify-center mb-0">
             <Image
               src={schoolLogo || LogoImage} // Dynamic logo
               alt={schoolName}
@@ -365,7 +365,7 @@ const BASE_URL = "/api/proxy";
               height={58}
               className="object-contain rounded-xl border-2 border-gray-300"
             />
-          </div>
+          </div> */}
           <div>
             <h1 className="text-lg font-bold text-foreground">{schoolName}</h1>
             {/* <p className="text-xs text-muted-foreground">{schoolName}</p> */}
