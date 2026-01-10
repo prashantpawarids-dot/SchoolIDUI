@@ -69,10 +69,9 @@ const exportOptions = [
     iconBg: "bg-primary/10",
     iconColor: "text-primary",
   },
-  
 ];
 
-export default function ExportData() {
+export default function ImportData() {
   /* =======================
      STATE
   ======================= */

@@ -124,7 +124,7 @@ localStorage.setItem("roleId", data.roleId.toString());
   />
   <div className="text-center space-y-4">
     <h1 className="text-4xl font-bold text-primary">
-      IDS ID SMART TECH
+      IDS ID PRIVATE LIMITED
     </h1>
     <p className="text-xl text-muted-foreground">
       ID Card Management System

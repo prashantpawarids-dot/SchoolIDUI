@@ -160,8 +160,8 @@ export function Sidebar({ role }: SidebarProps) {
         { href: "/admin/dashboard", label: "Dashboard", icon: BarChart3 },
         { href: "/admin/students", label: "Manage Students", icon: Users },
         { href: "/admin/print", label: "Print ID Cards", icon: Printer },
-        { href: "/admin/export", label: "Export Data", icon: Download },
-        { href: "/admin/school", label: "School Settings", icon: Building2 },
+        { href: "/admin/export",  label: "Export Data & Import Student Data", icon: Download },
+        { href: "/admin/school",   label: "School Manage and Academic Year ", icon: Building2 },
         { href: "/admin/classes", label: "Manage Classes", icon: Layers },
       ],
       school: [
@@ -208,7 +208,7 @@ export function Sidebar({ role }: SidebarProps) {
           />
         </div> */}
 
-        <div className="w-20 h-20 flex items-center justify-center mb-3">
+        <div className="w-20 h-20 flex items-center justify-center mb-1">
   <Image
     src={LogoImage}
     alt="Logo"
@@ -220,8 +220,8 @@ export function Sidebar({ role }: SidebarProps) {
 
 
         <div className="space-y-1">
-          <h2 className="font-bold text-lg text-foreground">
-            IDS ID SMART TECH
+          <h2 className="font-bold text-sm text-foreground">
+            IDS ID PVT LTD
           </h2>
           <p className="text-xs text-muted-foreground">ID Card Management</p>
         </div>
