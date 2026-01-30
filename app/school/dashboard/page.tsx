@@ -25,9 +25,9 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-// const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-const BASE_URL = "/api/proxy";
+// const BASE_URL = "/api/proxy";
 export default function AdminDashboard() {
   const [totalStudents, setTotalStudents] = useState(0);
   const [totalParents, setTotalParents] = useState(0);

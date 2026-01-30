@@ -25,8 +25,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-// const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-const BASE_URL ="/api/proxy";
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+// const BASE_URL ="/api/proxy";
 
 
 

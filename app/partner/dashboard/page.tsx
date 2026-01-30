@@ -13,8 +13,8 @@ import type { Student, Class } from "@/lib/types"
 
 
 
-// const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-const BASE_URL = "/api/proxy";
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+// const BASE_URL = "/api/proxy";
 
 
 

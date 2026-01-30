@@ -68,8 +68,8 @@ export default function ManageStudents() {
 
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
-// const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-const API_BASE_URL = "/api/proxy";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+// const API_BASE_URL = "/api/proxy";
 
   // Fetch schools
   useEffect(() => {

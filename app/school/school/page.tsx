@@ -182,10 +182,10 @@ import {
 } from "@/components/ui/select";
 import { Edit2, Trash2, Upload, Eye } from "lucide-react";
 
-// const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL + "/School";
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL + "/School";
 
 
-const BASE_URL = "/api/proxy"+"/School";
+// const BASE_URL = "/api/proxy"+"/School";
 
 
 export default function AdminSchoolsPage() {

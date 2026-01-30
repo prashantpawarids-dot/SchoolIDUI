@@ -26,8 +26,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
-const BASE_URL = "/api/proxy";
-// const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+// const BASE_URL = "/api/proxy";
+  const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
   useEffect(() => {
     if (searchParams.get("registered") === "true") {
       setShowSuccess(true);

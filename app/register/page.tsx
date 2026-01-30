@@ -27,8 +27,8 @@ export default function RegisterPage() {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [credentials, setCredentials] = useState<{ username: string; password: string } | null>(null) // <-- For showing credentials card
-// const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
-  const API_BASE = "/api/proxy";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
+  // const API_BASE = "/api/proxy";
   // Fetch schools
 useEffect(() => {
   fetch(`${API_BASE}/School/list`)
