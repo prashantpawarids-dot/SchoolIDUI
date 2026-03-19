@@ -278,7 +278,15 @@ useEffect(() => {
           <Button type="submit" disabled={isLoading} className="w-full h-12 text-lg">
             {isLoading ? "Registering..." : "Register"}
           </Button>
-           <Button type="button" variant="ghost" className="w-full" onClick={() => router.push("/login")}>Back to Login</Button>
+           {/* <Button type="button" variant="ghost" className="w-full" onClick={() => router.push("/login")}>Back to Login</Button> */}
+           <Button 
+  type="button" 
+  variant="ghost" 
+  className="w-full" 
+  onClick={() => router.back()}
+>
+  Back
+</Button>
 
 
           </form>

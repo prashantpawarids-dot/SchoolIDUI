@@ -135,7 +135,7 @@ import {
   Layers,
   BookOpen,
   Printer,
-  LogOut,
+  LogOut,FileUp 
 } from "lucide-react";
 import { clearAuthData } from "@/lib/auth";
 import Image from "next/image";
@@ -160,9 +160,12 @@ export function Sidebar({ role }: SidebarProps) {
         { href: "/admin/dashboard", label: "Dashboard", icon: BarChart3 },
         { href: "/admin/students", label: "Manage Students", icon: Users },
         { href: "/admin/print", label: "Print ID Cards", icon: Printer },
-        { href: "/admin/export",  label: "Export Data & Import Student Data", icon: Download },
+        { href: "/admin/export",  label: "Export Data", icon: Download },
         { href: "/admin/school",   label: "School Manage and Academic Year ", icon: Building2 },
         { href: "/admin/classes", label: "Manage Classes", icon: Layers },
+        { href: "/admin/import", label: "Import Student Data", icon: FileUp  },
+        { href: "/register", label: "Add New User", icon: Users },
+
       ],
       school: [
         { href: "/school/dashboard", label: "Dashboard", icon: BarChart3 },
@@ -171,6 +174,8 @@ export function Sidebar({ role }: SidebarProps) {
         { href: "/school/export", label: "Export Data", icon: Download },
         { href: "/school/school", label: "School Settings", icon: Building2 },
         { href: "/school/classes", label: "Manage Classes", icon: Layers },
+        { href: "/admin/import", label: "Import Student Data", icon: FileUp  },
+         { href: "/register", label: "Add New User", icon: Users },
       ],
       parent: [
         { href: "/parent/dashboard", label: "Dashboard", icon: BarChart3 },

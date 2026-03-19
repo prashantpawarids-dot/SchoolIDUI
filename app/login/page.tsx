@@ -200,16 +200,7 @@ localStorage.setItem("roleId", data.roleId.toString());
                   {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
 
-                <div className="text-center pt-2">
-                  <p className="text-sm text-muted-foreground">
-                    Don't have an account?{" "}
-                    <Link
-                      href="/register"
-                      className="text-primary hover:underline font-semibold">
-                      Register here
-                    </Link>
-                  </p>
-                </div>
+                
               </form>
             </CardContent>
           </Card>

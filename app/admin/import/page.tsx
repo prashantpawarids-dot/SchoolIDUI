@@ -1,413 +1,601 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 import { PageHeader } from "@/components/common/page-header";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
+  Card, CardContent, CardHeader, CardTitle, CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import {
-  FileSpreadsheet,
-  ImageIcon,
-  Archive,
-  Download,
-  CheckCircle,
-  Loader2,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  UploadCloud, FileSpreadsheet, Download, CheckCircle,
+  AlertCircle, Loader2, X, Info, ChevronRight,
 } from "lucide-react";
-import JSZip from "jszip";
+import type { School, AcademicYear, Class } from "@/lib/types";
 
-import type {
-  Student,
-  School,
-  AcademicYear,
-  Class,
-  Division,
-} from "@/lib/types";
+/* ─────────────────────────────────────────────
+   TYPES
+───────────────────────────────────────────── */
+interface ExcelRow {
+  DivisionName: string;
+  FirstName: string;
+  MiddleName?: string;
+  LastName: string;
+  RollNo: string;
+  DOB: string;
+  BloodGroup?: string;
+  Address?: string;
+  ParentFirstName: string;
+  ParentLastName: string;
+  ParentEmail: string;
+  ParentContact: string;
+}
 
-type ExportType = "excel" | "photos" | "all";
+interface RowResult {
+  rowIndex: number;
+  rollNo: string;
+  studentName: string;
+  status: "success" | "error";
+  message: string;
+}
 
-/* =======================
-   EXPORT OPTIONS
-======================= */
-const exportOptions = [
-  {
-    type: "excel" as ExportType,
-    title: "Export to Excel",
-    description: "Download student data as CSV/Excel spreadsheet",
-    icon: FileSpreadsheet,
-    color: "bg-green-600 hover:bg-green-700",
-    iconBg: "bg-green-100",
-    iconColor: "text-green-600",
-  },
-  {
-    type: "photos" as ExportType,
-    title: "Export Photos",
-    description: "Download all student photos as ZIP archive",
-    icon: ImageIcon,
-    color: "bg-amber-500 hover:bg-amber-600",
-    iconBg: "bg-amber-100",
-    iconColor: "text-amber-600",
-  },
-  {
-    type: "all" as ExportType,
-    title: "Export All Data",
-    description: "Download Excel with photo URLs",
-    icon: Archive,
-    color: "bg-primary hover:bg-primary/90",
-    iconBg: "bg-primary/10",
-    iconColor: "text-primary",
-  },
+const REQUIRED_COLUMNS: (keyof ExcelRow)[] = [
+  "DivisionName", "FirstName", "LastName",
+  "RollNo", "DOB", "ParentFirstName", "ParentLastName",
+  "ParentEmail", "ParentContact",
 ];
 
-export default function ImportData() {
-  /* =======================
-     STATE
-  ======================= */
-  const [schools, setSchools] = useState<School[]>([]);
+
+ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+/* ─────────────────────────────────────────────
+   TEMPLATE DOWNLOAD
+  (ClassName not needed — selected via UI)
+───────────────────────────────────────────── */
+function downloadTemplate() {
+  const headers = [
+    "DivisionName", "FirstName", "MiddleName", "LastName",
+    "RollNo", "DOB", "BloodGroup", "Address",
+    "ParentFirstName", "ParentLastName", "ParentEmail", "ParentContact",
+  ];
+  const sample = [
+    "A", "Aarav", "", "Shah",
+    "R001", "2015-06-15", "O+", "123 Main St",
+    "Raj", "Shah", "raj.shah@email.com", "9876543210",
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([headers, sample]);
+  ws["!cols"] = headers.map(() => ({ wch: 18 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Students");
+  XLSX.writeFile(wb, "student_import_template.xlsx");
+}
+
+/* ─────────────────────────────────────────────
+   STEP BADGE
+───────────────────────────────────────────── */
+function StepBadge({ n, done }: { n: number; done: boolean }) {
+  return (
+    <span
+      className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold mr-2
+        ${done ? "bg-green-600 text-white" : "bg-primary text-primary-foreground"}`}
+    >
+      {done ? <CheckCircle className="w-3.5 h-3.5" /> : n}
+    </span>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   MAIN COMPONENT
+───────────────────────────────────────────── */
+export default function ImportExcelPage() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [schools, setSchools]             = useState<School[]>([]);
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [divisions, setDivisions] = useState<Division[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [studentStatuses, setStudentStatuses] = useState<Record<number, string>>({});
+  const [classes, setClasses]             = useState<Class[]>([]);
 
-  const [selectedSchool, setSelectedSchool] = useState("all");
-  const [selectedYear, setSelectedYear] = useState("all");
-  const [selectedClass, setSelectedClass] = useState("all");
-  const [selectedDivision, setSelectedDivision] = useState("all");
-  const [selectedStatus, setSelectedStatus] = useState<"all" | string>("all");
+  const [selectedSchool, setSelectedSchool] = useState("");
+  const [selectedYear,   setSelectedYear]   = useState("");
+  const [selectedClass,  setSelectedClass]  = useState("");
 
-  const [exportingType, setExportingType] = useState<ExportType | null>(null);
-  const [exportSuccess, setExportSuccess] = useState<ExportType | null>(null);
-// const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const [fileName,         setFileName]         = useState("");
+  const [allRows,          setAllRows]          = useState<ExcelRow[]>([]);
+  const [previewRows,      setPreviewRows]      = useState<ExcelRow[]>([]);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
-const API_BASE_URL = "/api/proxy";
+  const [importing,  setImporting]  = useState(false);
+  const [results,    setResults]    = useState<RowResult[]>([]);
+  const [importDone, setImportDone] = useState(false);
 
-  /* =======================
-     INITIAL LOAD
-  ======================= */
+  /* ══════════════════════════════════════════
+     DATA FETCHING
+  ══════════════════════════════════════════ */
   useEffect(() => {
-    // Fetch schools
     fetch(`${API_BASE_URL}/School/list`)
-      .then((res) => res.json())
+      .then((r) => r.json())
       .then(setSchools)
-      .catch((err) => console.error("Error fetching schools:", err));
-
-    // Fetch all students
-    fetch(`${API_BASE_URL}/Student/getall`)
-      .then((res) => res.json())
-      .then(async (studentsData: Student[]) => {
-        setStudents(studentsData);
-
-        // Fetch statuses for all students
-        const statusMap: Record<number, string> = {};
-
-        await Promise.all(
-          studentsData.map(async (s: Student) => {
-            if (!s.studentId) {
-              console.warn("Skipping student with missing studentId:", s);
-              return;
-            }
-
-            try {
-              const res = await fetch(
-                `${API_BASE_URL}/Student/applications/student/${s.studentId}`
-              );
-              if (!res.ok) {
-                console.warn("Failed to fetch status for studentId", s.studentId);
-                statusMap[s.studentId] = "";
-                return;
-              }
-
-              const data = await res.json();
-              statusMap[s.studentId] = data[0]?.status ?? "";
-            } catch (err) {
-              console.error("Error fetching status for studentId", s.studentId, err);
-              statusMap[s.studentId] = "";
-            }
-          })
-        );
-
-        setStudentStatuses(statusMap);
-      })
-      .catch((err) => console.error("Error fetching students:", err));
+      .catch(console.error);
   }, []);
 
-  /* =======================
-     DEPENDENT DROPDOWNS
-  ======================= */
+  // When school changes → load academic years
   useEffect(() => {
-    if (selectedSchool !== "all") {
-      fetch(`${API_BASE_URL}/School/academicyear/${selectedSchool}`)
-        .then((res) => res.json())
-        .then(setAcademicYears);
+    if (!selectedSchool) return;
+    setSelectedYear("");
+    setSelectedClass("");
+    setAcademicYears([]);
+    setClasses([]);
+    clearFile();
 
-      fetch(`${API_BASE_URL}/ClassDivision/getclasses?schoolId=${selectedSchool}`)
-        .then((res) => res.json())
-        .then(setClasses);
-    } else {
-      setAcademicYears([]);
-      setClasses([]);
-      setDivisions([]);
-    }
+    fetch(`${API_BASE_URL}/School/academicyear/${selectedSchool}`)
+      .then((r) => r.json())
+      .then(setAcademicYears)
+      .catch(console.error);
   }, [selectedSchool]);
 
+  // When year changes → load classes
   useEffect(() => {
-    if (selectedClass !== "all") {
-      fetch(`${API_BASE_URL}/ClassDivision/getdivisions?classId=${selectedClass}`)
-        .then((res) => res.json())
-        .then(setDivisions);
-    } else {
-      setDivisions([]);
-    }
+    if (!selectedSchool || !selectedYear) return;
+    setSelectedClass("");
+    setClasses([]);
+    clearFile();
+
+    fetch(`${API_BASE_URL}/ClassDivision/getclasses?schoolId=${selectedSchool}`)
+      .then((r) => r.json())
+      .then(setClasses)
+      .catch(console.error);
+  }, [selectedYear]);
+
+  // When class changes → clear file
+  useEffect(() => {
+    if (selectedClass) clearFile();
   }, [selectedClass]);
 
-  const filteredStudents = students.filter((s) => {
-    if (selectedSchool !== "all" && s.schoolId?.toString() !== selectedSchool) return false;
-    if (selectedYear !== "all" && s.academicYearId?.toString() !== selectedYear) return false;
-    if (selectedClass !== "all" && s.classId?.toString() !== selectedClass) return false;
-    if (selectedDivision !== "all" && s.divisionId?.toString() !== selectedDivision) return false;
-
-    if (selectedStatus !== "all") {
-      const status = studentStatuses[s.studentId]?.toLowerCase() ?? "";
-      if (status !== selectedStatus) return false;
-    }
-
-    return true;
-  });
-
-  /* =======================
-     EXPORT HANDLER
-  ======================= */
-  const handleExport = async (type: ExportType) => {
-    setExportingType(type);
-    setExportSuccess(null);
-
-    if (type === "excel" || type === "all") {
-      const headers = ["Roll No", "Full Name", "Class", "Division", "DOB", "Blood Group", "Address", "Status"];
-      const rows = filteredStudents.map((s) => [
-        s.rollNo,
-        s.fullName,
-        s.className,
-        s.divisionName,
-        s.dob,
-        s.bloodGroup,
-        `"${s.address}"`,
-        studentStatuses[s.studentId] ?? "",
-      ]);
-
-      const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `students_export_${Date.now()}.csv`;
-      link.click();
-      URL.revokeObjectURL(link.href);
-    }
-
-    if (type === "photos") {
-      const zip = new JSZip();
-      filteredStudents.forEach((s) => {
-        if (!s.photoPath) return;
-        const base64Data = s.photoPath.split(",")[1]; // Remove data:image/...;base64,
-        zip.file(`${s.rollNo}_${s.fullName}.jpg`, base64Data, { base64: true });
-      });
-
-      const content = await zip.generateAsync({ type: "blob" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(content);
-      link.download = `student_photos_${Date.now()}.zip`;
-      link.click();
-      URL.revokeObjectURL(link.href);
-    }
-
-    setExportSuccess(type);
-    setTimeout(() => setExportSuccess(null), 3000);
-    setExportingType(null);
+  /* ══════════════════════════════════════════
+     FILE HELPERS
+  ══════════════════════════════════════════ */
+  const clearFile = () => {
+    setFileName("");
+    setAllRows([]);
+    setPreviewRows([]);
+    setValidationErrors([]);
+    setResults([]);
+    setImportDone(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  /* =======================
-     UI
-  ======================= */
+  const parseFile = (file: File) => {
+    setFileName(file.name);
+    setResults([]);
+    setImportDone(false);
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const wb = XLSX.read(evt.target?.result, { type: "binary" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json: ExcelRow[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+      const errors: string[] = [];
+      if (json.length === 0) {
+        errors.push("Excel file is empty.");
+      } else {
+        REQUIRED_COLUMNS.forEach((col) => {
+          if (!(col in json[0]))
+            errors.push(`Missing required column: "${col}"`);
+        });
+        json.forEach((row, i) => {
+          if (!row.FirstName)    errors.push(`Row ${i + 2}: FirstName is required`);
+          if (!row.LastName)     errors.push(`Row ${i + 2}: LastName is required`);
+          if (!row.RollNo)       errors.push(`Row ${i + 2}: RollNo is required`);
+          if (!row.DivisionName) errors.push(`Row ${i + 2}: DivisionName is required`);
+          if (!row.ParentEmail)  errors.push(`Row ${i + 2}: ParentEmail is required`);
+        });
+      }
+
+      setValidationErrors(errors);
+      setAllRows(json);
+      setPreviewRows(json.slice(0, 5));
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) parseFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    if (fileInputRef.current) fileInputRef.current.files = dt.files;
+    parseFile(file);
+  };
+
+  /* ══════════════════════════════════════════
+     IMPORT
+  ══════════════════════════════════════════ */
+  const handleImport = async () => {
+    if (!canImport) return;
+    setImporting(true);
+    setResults([]);
+
+    try {
+      const payload = {
+        schoolId:      parseInt(selectedSchool),
+        academicYearId: parseInt(selectedYear),
+        classId:       parseInt(selectedClass),
+        students: allRows.map((row) => ({
+          divisionName:    row.DivisionName,
+          firstName:       row.FirstName,
+          middleName:      row.MiddleName ?? "",
+          lastName:        row.LastName,
+          rollNo:          row.RollNo,
+          dob:             row.DOB,
+          bloodGroup:      row.BloodGroup ?? "",
+          address:         row.Address ?? "",
+          parentFirstName: row.ParentFirstName,
+          parentLastName:  row.ParentLastName,
+          parentEmail:     row.ParentEmail,
+          parentContact:   row.ParentContact,
+        })),
+      };
+
+      const res = await fetch(`${API_BASE_URL}/Student/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error((await res.text()) || "Import failed");
+
+      const data: RowResult[] = await res.json();
+      setResults(data);
+      setImportDone(true);
+    } catch (err: any) {
+      setResults([{
+        rowIndex: 0, rollNo: "-", studentName: "-",
+        status: "error", message: err.message ?? "Unknown error",
+      }]);
+      setImportDone(true);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  /* ══════════════════════════════════════════
+     DERIVED
+  ══════════════════════════════════════════ */
+  const step1Done = !!selectedSchool && !!selectedYear && !!selectedClass;
+  const step2Done = step1Done && allRows.length > 0 && validationErrors.length === 0;
+  const canImport = step2Done && !importing && !importDone;
+
+  const selectedSchoolName = schools.find(s => s.schoolId.toString() === selectedSchool)?.schoolName ?? "";
+  const selectedYearName   = academicYears.find(y => y.academicYearId.toString() === selectedYear)?.academicYear ?? "";
+  const selectedClassName  = classes.find(c => c.classId.toString() === selectedClass)?.className ?? "";
+
+  const successCount = results.filter((r) => r.status === "success").length;
+  const errorCount   = results.filter((r) => r.status === "error").length;
+
+  /* ══════════════════════════════════════════
+     RENDER
+  ══════════════════════════════════════════ */
   return (
     <div className="space-y-6">
-      <PageHeader title="Export Student Data" description="Export students using filters and preview before download" />
+      <PageHeader
+        title="Import Students from Excel"
+        description="Select school, year and class — then upload an Excel file to bulk-import students."
+      />
 
-      {/* FILTERS */}
-      <Card>
-        <CardContent className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          {/* School */}
-          <div>
-            <Label>School</Label>
-            <Select value={selectedSchool} onValueChange={setSelectedSchool}>
-              <SelectTrigger><SelectValue placeholder="Select School" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Schools</SelectItem>
-                {schools.map((s) => (
-                  <SelectItem key={s.schoolId} value={s.schoolId.toString()}>{s.schoolName}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Year */}
-          <div>
-            <Label>Academic Year</Label>
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger><SelectValue placeholder="Select Year" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {academicYears.map((y) => (
-                  <SelectItem key={y.academicYearId} value={y.academicYearId.toString()}>{y.academicYear}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Class */}
-          <div>
-            <Label>Class</Label>
-            <Select value={selectedClass} onValueChange={setSelectedClass}>
-              <SelectTrigger><SelectValue placeholder="Select Class" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {classes.map((c) => (
-                  <SelectItem key={c.classId} value={c.classId.toString()}>{c.className}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Division */}
-          <div>
-            <Label>Division</Label>
-            <Select value={selectedDivision} onValueChange={setSelectedDivision}>
-              <SelectTrigger><SelectValue placeholder="Select Division" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {divisions.map((d) => (
-                  <SelectItem key={d.divisionId} value={d.divisionId.toString()}>{d.divisionName}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Status */}
-          <div>
-            <Label>Status</Label>
-            <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as any)}>
-              <SelectTrigger><SelectValue placeholder="Select Status" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="accept">Accepted</SelectItem>
-                <SelectItem value="reject">Rejected</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* EXPORT OPTIONS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {exportOptions.map((option) => {
-          const Icon = option.icon;
-          const isExporting = exportingType === option.type;
-          const isSuccess = exportSuccess === option.type;
-
-          return (
-            <Card key={option.type} className="shadow-lg border-0">
-              <CardHeader>
-                <div className={`w-14 h-14 rounded-xl ${option.iconBg} flex items-center justify-center mb-3`}>
-                  <Icon className={`w-7 h-7 ${option.iconColor}`} />
-                </div>
-                <CardTitle>{option.title}</CardTitle>
-                <CardDescription>{option.description}</CardDescription>
-              </CardHeader>
-
-              <CardContent>
-                <div className="text-xs mb-3">
-                  Exporting <b>{filteredStudents.length}</b> students
-                </div>
-
-                <Button
-                  onClick={() => handleExport(option.type)}
-                  disabled={filteredStudents.length === 0 || isExporting}
-                  className={`w-full ${option.color}`}
-                >
-                  {isExporting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Exporting
-                    </>
-                  ) : isSuccess ? (
-                    <>
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Downloaded
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* PREVIEW */}
+      {/* ══ STEP 1 ══ */}
       <Card>
         <CardHeader>
-          <CardTitle>Student Preview</CardTitle>
-          <CardDescription>Filtered students</CardDescription>
+          <CardTitle className="text-base flex items-center">
+            <StepBadge n={1} done={step1Done} />
+            Select School, Academic Year &amp; Class
+          </CardTitle>
+          <CardDescription>All three must be selected before uploading.</CardDescription>
         </CardHeader>
 
-        <CardContent className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/30">
-              <tr>
-                <th className="p-2 text-left font-bold">Roll No</th>
-                <th className="p-2 text-left font-bold">Student Name</th>
-                <th className="p-2 text-left font-bold">Class</th>
-                <th className="p-2 text-left font-bold">Division</th>
-                <th className="p-2 text-left font-bold">Status</th>
-              </tr>
-            </thead>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* School */}
+            <div className="space-y-1.5">
+              <Label>School <span className="text-destructive">*</span></Label>
+              <Select value={selectedSchool} onValueChange={setSelectedSchool}>
+                <SelectTrigger><SelectValue placeholder="Choose school…" /></SelectTrigger>
+                <SelectContent>
+                  {schools.map((s) => (
+                    <SelectItem key={s.schoolId} value={s.schoolId.toString()}>
+                      {s.schoolName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <tbody>
-              {filteredStudents.slice(0, 10).map((s) => (
-                <tr key={s.studentId} className="border-b">
-                  <td className="p-2">{s.rollNo}</td>
-                  <td className="p-2 font-medium">{s.fullName}</td>
-                  <td className="p-2">{s.className}</td>
-                  <td className="p-2">{s.divisionName}</td>
-                  <td className="p-2 capitalize">{studentStatuses[s.studentId] ?? ""}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            {/* Academic Year */}
+            <div className="space-y-1.5">
+              <Label>Academic Year <span className="text-destructive">*</span></Label>
+              <Select
+                value={selectedYear}
+                onValueChange={setSelectedYear}
+                disabled={!selectedSchool}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={selectedSchool ? "Choose year…" : "Select school first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {academicYears.map((y) => (
+                    <SelectItem key={y.academicYearId} value={y.academicYearId.toString()}>
+                      {y.academicYear}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {filteredStudents.length > 10 && (
-            <p className="text-sm text-muted-foreground mt-2 text-center">
-              Showing 10 of {filteredStudents.length} students
-            </p>
+            {/* Class */}
+            <div className="space-y-1.5">
+              <Label>Class <span className="text-destructive">*</span></Label>
+              <Select
+                value={selectedClass}
+                onValueChange={setSelectedClass}
+                disabled={!selectedYear}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={selectedYear ? "Choose class…" : "Select year first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.map((c) => (
+                    <SelectItem key={c.classId} value={c.classId.toString()}>
+                      {c.className}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Selection summary */}
+          {step1Done && (
+            <div className="inline-flex items-center gap-1.5 text-sm bg-green-50 border border-green-200 text-green-800 rounded-full px-3 py-1">
+              <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+              <span>{selectedSchoolName}</span>
+              <ChevronRight className="w-3 h-3 opacity-40" />
+              <span>{selectedYearName}</span>
+              <ChevronRight className="w-3 h-3 opacity-40" />
+              <span className="font-semibold">{selectedClassName}</span>
+            </div>
           )}
         </CardContent>
       </Card>
+
+      {/* ══ STEP 2 ══ */}
+      <Card className={!step1Done ? "opacity-50 pointer-events-none select-none" : ""}>
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle className="text-base flex items-center">
+              <StepBadge n={2} done={step2Done} />
+              Upload Excel File
+            </CardTitle>
+            <CardDescription>
+              One student per row. Division must already exist under <b>{selectedClassName || "the selected class"}</b>.
+            </CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={downloadTemplate} className="shrink-0">
+            <Download className="w-4 h-4 mr-2" />
+            Download Template
+          </Button>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {/* Info banner */}
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800">
+            <Info className="w-4 h-4 mt-0.5 shrink-0" />
+            <div>
+              <b>Required columns:</b> DivisionName · FirstName · LastName · RollNo · DOB (YYYY-MM-DD) ·
+              ParentFirstName · ParentLastName · ParentEmail · ParentContact.
+              <br />
+              <b>Optional:</b> MiddleName · BloodGroup · Address.
+              &nbsp;<span className="font-semibold text-blue-700">ClassName is NOT needed</span> — selected above.
+            </div>
+          </div>
+
+          {/* Drop zone */}
+          <div
+            className="border-2 border-dashed rounded-xl p-10 text-center cursor-pointer
+              border-primary/40 hover:border-primary hover:bg-primary/5 transition-colors"
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+          >
+            {fileName ? (
+              <div className="flex items-center justify-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-green-600" />
+                <span className="font-medium text-green-700">{fileName}</span>
+                <button
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={(e) => { e.stopPropagation(); clearFile(); }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <UploadCloud className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Drag &amp; drop your Excel file here, or click to browse
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">.xlsx or .xls</p>
+              </>
+            )}
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+
+          {/* Validation errors */}
+          {validationErrors.length > 0 && (
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+              <div className="flex items-center gap-2 text-destructive font-semibold mb-2">
+                <AlertCircle className="w-4 h-4" />
+                Validation Errors ({validationErrors.length})
+              </div>
+              <ul className="text-sm text-destructive space-y-1 list-disc list-inside">
+                {validationErrors.slice(0, 10).map((e, i) => <li key={i}>{e}</li>)}
+                {validationErrors.length > 10 && (
+                  <li>…and {validationErrors.length - 10} more</li>
+                )}
+              </ul>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ══ STEP 3 — PREVIEW & IMPORT ══ */}
+      {step2Done && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center">
+              <StepBadge n={3} done={importDone} />
+              Preview &amp; Import
+            </CardTitle>
+            <CardDescription>
+              <b>{allRows.length}</b> student{allRows.length !== 1 ? "s" : ""} ready to import into{" "}
+              <span className="font-semibold">{selectedClassName}</span>.
+              Each will receive a{" "}
+              <span className="text-amber-600 font-semibold">Pending</span> application automatically.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="space-y-4">
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40">
+                  <tr>
+                    {["#", "Division", "Roll No", "Student Name", "DOB", "Blood Group", "Parent", "Contact"].map((h) => (
+                      <th key={h} className="p-2 text-left font-semibold whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewRows.map((row, i) => (
+                    <tr key={i} className="border-t hover:bg-muted/20">
+                      <td className="p-2 text-muted-foreground">{i + 1}</td>
+                      <td className="p-2">{row.DivisionName}</td>
+                      <td className="p-2">{row.RollNo}</td>
+                      <td className="p-2 font-medium">
+                        {[row.FirstName, row.MiddleName, row.LastName].filter(Boolean).join(" ")}
+                      </td>
+                      <td className="p-2">{row.DOB}</td>
+                      <td className="p-2">{row.BloodGroup || "—"}</td>
+                      <td className="p-2">{row.ParentFirstName} {row.ParentLastName}</td>
+                      <td className="p-2">{row.ParentContact}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {allRows.length > 5 && (
+              <p className="text-xs text-center text-muted-foreground">
+                Showing 5 of {allRows.length} rows
+              </p>
+            )}
+
+            {!importDone && (
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={clearFile} disabled={importing}>
+                  Cancel
+                </Button>
+                <Button onClick={handleImport} disabled={!canImport} className="min-w-44">
+                  {importing ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Importing…</>
+                  ) : (
+                    <><UploadCloud className="w-4 h-4 mr-2" /> Import {allRows.length} Students</>
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {importing && (
+              <p className="text-sm text-center text-muted-foreground animate-pulse">
+                Processing {allRows.length} students, please wait…
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ══ RESULTS ══ */}
+      {importDone && results.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-3">
+              Import Results
+              {successCount > 0 && (
+                <span className="inline-flex items-center gap-1 text-green-700 text-sm font-normal bg-green-50 border border-green-200 rounded-full px-2.5 py-0.5">
+                  <CheckCircle className="w-3.5 h-3.5" /> {successCount} imported
+                </span>
+              )}
+              {errorCount > 0 && (
+                <span className="inline-flex items-center gap-1 text-destructive text-sm font-normal bg-destructive/10 border border-destructive/20 rounded-full px-2.5 py-0.5">
+                  <AlertCircle className="w-3.5 h-3.5" /> {errorCount} failed
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent className="space-y-4 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40">
+                <tr>
+                  {["Row", "Roll No", "Student", "Result", "Message"].map((h) => (
+                    <th key={h} className="p-2 text-left font-semibold">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((r, i) => (
+                  <tr key={i} className={`border-t ${r.status === "error" ? "bg-destructive/5" : ""}`}>
+                    <td className="p-2 text-muted-foreground">{r.rowIndex}</td>
+                    <td className="p-2">{r.rollNo}</td>
+                    <td className="p-2 font-medium">{r.studentName}</td>
+                    <td className="p-2">
+                      {r.status === "success" ? (
+                        <span className="inline-flex items-center gap-1 text-green-700 font-medium">
+                          <CheckCircle className="w-3.5 h-3.5" /> Success
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-destructive font-medium">
+                          <AlertCircle className="w-3.5 h-3.5" /> Failed
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-2 text-muted-foreground text-xs">{r.message}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={clearFile}>
+                Import Another File
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
