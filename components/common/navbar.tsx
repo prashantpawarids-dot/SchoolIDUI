@@ -1,5 +1,4 @@
-// "use client";
-
+// 'use client';
 // import { useRouter } from "next/navigation";
 // import { useEffect, useState } from "react";
 // import { Button } from "@/components/ui/button";
@@ -11,84 +10,135 @@
 //   DropdownMenuTrigger,
 // } from "@/components/ui/dropdown-menu";
 // import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-// import {
-//   Bell,
-//   ChevronDown,
-//   LogOut,
-//   Settings,
-//   User,
-//   GraduationCap,
-// } from "lucide-react";
+// import { Bell, ChevronDown, LogOut, Settings, User } from "lucide-react";
 // import { Badge } from "@/components/ui/badge";
-// import LogoImage from "@/asset/logo2.jpeg"; // adjust the path if needed
+// import LogoImage from "@/asset/logo2.jpeg"; // Default logo
 // import Image from "next/image";
+
 // interface NavbarProps {
 //   userRole?: string;
-// }
-
-// interface UserDetails {
-//   firstName: string;
-//   middleName?: string;
-//   lastName: string;
-//   email: string;
-//   schoolId: number;
-//   roleId: number;
-// }
-
-// interface School {
-//   schoolId: number;
-//   schoolName: string;
 // }
 
 // export function Navbar({ userRole = "Admin" }: NavbarProps) {
 //   const router = useRouter();
 //   const [userInitial, setUserInitial] = useState("U");
-//   const [userName, setUserName] = useState(userRole); // fallback to role
+//   const [userName, setUserName] = useState(userRole);
 //   const [userEmail, setUserEmail] = useState("");
 //   const [schoolName, setSchoolName] = useState("ID Card Management System");
+//   const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
 //   const [roleId, setRoleId] = useState<number>(0);
+// const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+// // const BASE_URL = "/api/proxy";
+//   // useEffect(() => {
+//   //   const roleIdStr = localStorage.getItem("roleId");
+//   //   const userId = localStorage.getItem("userId");
+//   //   const schoolId = localStorage.getItem("schoolId");
+
+//   //   if (!userId || !roleIdStr) return;
+
+//   //   const roleIdNum = parseInt(roleIdStr, 10);
+//   //   setRoleId(roleIdNum);
+
+//   //   const fetchUserData = async () => {
+//   //     try {
+//   //       // Fetch user details
+//   //       const resUser = await fetch(
+//   //         `${process.env.NEXT_PUBLIC_API_BASE_URL}/Auth/userdetails/${userId}`
+//   //       );
+//   //       if (!resUser.ok) throw new Error("Failed to fetch user");
+//   //       const userData = await resUser.json();
+
+//   //       const fullName = `${userData.firstName} ${userData.lastName}`.trim();
+//   //       setUserName(fullName);
+//   //       setUserInitial(fullName.charAt(0));
+//   //       setUserEmail(userData.email);
+
+//   //       // Only fetch school info for Parent or School users
+//   //       if (roleIdNum === 2 || roleIdNum === 4) {
+//   //         const resSchool = await fetch(
+//   //           `${process.env.NEXT_PUBLIC_API_BASE_URL}/School/list`
+//   //         );
+//   //         if (!resSchool.ok) throw new Error("Failed to fetch schools");
+//   //         const schools = await resSchool.json();
+
+//   //         const school = schools.find(
+//   //           (s: any) => s.schoolId.toString() === schoolId
+//   //         );
+
+//   //         if (school) {
+//   //           setSchoolName(school.schoolName);
+//   //           if (school.schoolLogo) {
+//   //             setSchoolLogo(`data:image/jpeg;base64,${school.schoolLogo}`);
+//   //           }
+//   //         }
+//   //       }
+//   //     } catch (err) {
+//   //       console.error("Navbar fetch error:", err);
+//   //     }
+//   //   };
+
+//   //   fetchUserData();
+//   // }, []);
 
 //   useEffect(() => {
-//     const roleId = localStorage.getItem("roleId"); // string
-//     const userId = localStorage.getItem("userId");
-//     const schoolId = localStorage.getItem("schoolId");
+//   const roleIdStr = localStorage.getItem("roleId");
+//   const userId = localStorage.getItem("userId");
+//   const schoolId = localStorage.getItem("schoolId");
 
-//     if (!userId || !roleId) return;
+//   if (!userId || !roleIdStr) return;
 
-//     const fetchUserData = async () => {
-//       try {
-//         // Fetch user details
-//         const resUser = await fetch(
-//           `${process.env.NEXT_PUBLIC_API_BASE_URL}/Auth/userdetails/${userId}`
-//         );
-//         if (!resUser.ok) throw new Error("Failed to fetch user");
-//         const userData = await resUser.json();
+//   const roleIdNum = parseInt(roleIdStr, 10);
+//   setRoleId(roleIdNum);
 
-//         const fullName = `${userData.firstName} ${userData.lastName}`.trim();
-//         setUserName(fullName);
-//         setUserInitial(fullName.charAt(0));
-//         setUserEmail(userData.email);
+//   const fetchUserData = async () => {
+//     try {
+//       // Fetch user details via proxy
+//       const resUser = await fetch(`${BASE_URL}/Auth/userdetails/${userId}`);
+//       const textUser = await resUser.text();
 
-//         // Only fetch school name for Parent (2) or School (4)
-//         if (roleId === "2" || roleId === "4") {
-//           const resSchool = await fetch(
-//             `${process.env.NEXT_PUBLIC_API_BASE_URL}/School/list`
-//           );
-//           if (!resSchool.ok) throw new Error("Failed to fetch schools");
-//           const schools = await resSchool.json();
-
-//           const school = schools.find(
-//             (s: any) => s.schoolId.toString() === schoolId
-//           );
-//           if (school) setSchoolName(school.schoolName);
-//         }
-//       } catch (err) {
-//         console.error("Navbar fetch error:", err);
+//       // Check for HTML response
+//       if (textUser.trim().startsWith("<")) {
+//         console.error("Navbar fetch returned HTML instead of JSON:", textUser);
+//         return;
 //       }
-//     };
 
-//     fetchUserData();
-//   }, []);
+//       const userData = JSON.parse(textUser);
+
+//       const fullName = `${userData.firstName} ${userData.lastName}`.trim();
+//       setUserName(fullName);
+//       setUserInitial(fullName.charAt(0));
+//       setUserEmail(userData.email);
+
+//       // Only fetch school info for Parent or School users
+//       if (roleIdNum === 2 || roleIdNum === 4) {
+//         const resSchool = await fetch(`${BASE_URL}/School/list`);
+//         const textSchool = await resSchool.text();
+
+//         if (textSchool.trim().startsWith("<")) {
+//           console.error("School fetch returned HTML instead of JSON:", textSchool);
+//           return;
+//         }
+
+//         const schools = JSON.parse(textSchool);
+//         const school = schools.find(
+//           (s: any) => s.schoolId.toString() === schoolId
+//         );
+
+//         if (school) {
+//           setSchoolName(school.schoolName);
+//           if (school.schoolLogo) {
+//             setSchoolLogo(`data:image/jpeg;base64,${school.schoolLogo}`);
+//           }
+//         }
+//       }
+//     } catch (err) {
+//       console.error("Navbar fetch error:", err);
+//     }
+//   };
+
+//   fetchUserData();
+// }, []);
+
 
 //   const handleLogout = () => {
 //     localStorage.clear();
@@ -110,20 +160,18 @@
 //       <div className="h-16 px-6 flex items-center justify-between">
 //         {/* Logo / School */}
 //         <div className="flex items-center gap-3">
-//           <div className="w-20 h-20 flex items-center justify-center mb-3">
+//           {/* <div className="w-20 h-20 flex items-center justify-center mb-0">
 //             <Image
-//               src={LogoImage}
-//               alt="Logo"
+//               src={schoolLogo || LogoImage} // Dynamic logo
+//               alt={schoolName}
 //               width={60}
-//               height={40}
+//               height={58}
 //               className="object-contain rounded-xl border-2 border-gray-300"
 //             />
-//           </div>
+//           </div> */}
 //           <div>
-//             <h1 className="text-lg font-bold text-foreground">
-//               IDS ID SMART TECH
-//             </h1>
-//             <p className="text-xs text-muted-foreground">{schoolName}</p>
+//             <h1 className="text-lg font-bold text-foreground">{schoolName}</h1>
+//             {/* <p className="text-xs text-muted-foreground">{schoolName}</p> */}
 //           </div>
 //         </div>
 
@@ -194,8 +242,8 @@
 //   );
 // }
 
-"use client";
 
+"use client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -218,124 +266,75 @@ interface NavbarProps {
 
 export function Navbar({ userRole = "Admin" }: NavbarProps) {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false); // <--- Added
   const [userInitial, setUserInitial] = useState("U");
   const [userName, setUserName] = useState(userRole);
   const [userEmail, setUserEmail] = useState("");
   const [schoolName, setSchoolName] = useState("ID Card Management System");
   const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
   const [roleId, setRoleId] = useState<number>(0);
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-// const BASE_URL = "/api/proxy";
-  // useEffect(() => {
-  //   const roleIdStr = localStorage.getItem("roleId");
-  //   const userId = localStorage.getItem("userId");
-  //   const schoolId = localStorage.getItem("schoolId");
+  const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-  //   if (!userId || !roleIdStr) return;
-
-  //   const roleIdNum = parseInt(roleIdStr, 10);
-  //   setRoleId(roleIdNum);
-
-  //   const fetchUserData = async () => {
-  //     try {
-  //       // Fetch user details
-  //       const resUser = await fetch(
-  //         `${process.env.NEXT_PUBLIC_API_BASE_URL}/Auth/userdetails/${userId}`
-  //       );
-  //       if (!resUser.ok) throw new Error("Failed to fetch user");
-  //       const userData = await resUser.json();
-
-  //       const fullName = `${userData.firstName} ${userData.lastName}`.trim();
-  //       setUserName(fullName);
-  //       setUserInitial(fullName.charAt(0));
-  //       setUserEmail(userData.email);
-
-  //       // Only fetch school info for Parent or School users
-  //       if (roleIdNum === 2 || roleIdNum === 4) {
-  //         const resSchool = await fetch(
-  //           `${process.env.NEXT_PUBLIC_API_BASE_URL}/School/list`
-  //         );
-  //         if (!resSchool.ok) throw new Error("Failed to fetch schools");
-  //         const schools = await resSchool.json();
-
-  //         const school = schools.find(
-  //           (s: any) => s.schoolId.toString() === schoolId
-  //         );
-
-  //         if (school) {
-  //           setSchoolName(school.schoolName);
-  //           if (school.schoolLogo) {
-  //             setSchoolLogo(`data:image/jpeg;base64,${school.schoolLogo}`);
-  //           }
-  //         }
-  //       }
-  //     } catch (err) {
-  //       console.error("Navbar fetch error:", err);
-  //     }
-  //   };
-
-  //   fetchUserData();
-  // }, []);
+  // Set mounted to true after client renders
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
-  const roleIdStr = localStorage.getItem("roleId");
-  const userId = localStorage.getItem("userId");
-  const schoolId = localStorage.getItem("schoolId");
+    const roleIdStr = localStorage.getItem("roleId");
+    const userId = localStorage.getItem("userId");
+    const schoolId = localStorage.getItem("schoolId");
 
-  if (!userId || !roleIdStr) return;
+    if (!userId || !roleIdStr) return;
 
-  const roleIdNum = parseInt(roleIdStr, 10);
-  setRoleId(roleIdNum);
+    const roleIdNum = parseInt(roleIdStr, 10);
+    setRoleId(roleIdNum);
 
-  const fetchUserData = async () => {
-    try {
-      // Fetch user details via proxy
-      const resUser = await fetch(`${BASE_URL}/Auth/userdetails/${userId}`);
-      const textUser = await resUser.text();
+    const fetchUserData = async () => {
+      try {
+        const resUser = await fetch(`${BASE_URL}/Auth/userdetails/${userId}`);
+        const textUser = await resUser.text();
 
-      // Check for HTML response
-      if (textUser.trim().startsWith("<")) {
-        console.error("Navbar fetch returned HTML instead of JSON:", textUser);
-        return;
-      }
-
-      const userData = JSON.parse(textUser);
-
-      const fullName = `${userData.firstName} ${userData.lastName}`.trim();
-      setUserName(fullName);
-      setUserInitial(fullName.charAt(0));
-      setUserEmail(userData.email);
-
-      // Only fetch school info for Parent or School users
-      if (roleIdNum === 2 || roleIdNum === 4) {
-        const resSchool = await fetch(`${BASE_URL}/School/list`);
-        const textSchool = await resSchool.text();
-
-        if (textSchool.trim().startsWith("<")) {
-          console.error("School fetch returned HTML instead of JSON:", textSchool);
+        if (textUser.trim().startsWith("<")) {
+          console.error("Navbar fetch returned HTML instead of JSON:", textUser);
           return;
         }
 
-        const schools = JSON.parse(textSchool);
-        const school = schools.find(
-          (s: any) => s.schoolId.toString() === schoolId
-        );
+        const userData = JSON.parse(textUser);
 
-        if (school) {
-          setSchoolName(school.schoolName);
-          if (school.schoolLogo) {
-            setSchoolLogo(`data:image/jpeg;base64,${school.schoolLogo}`);
+        const fullName = `${userData.firstName} ${userData.lastName}`.trim();
+        setUserName(fullName);
+        setUserInitial(fullName.charAt(0));
+        setUserEmail(userData.email);
+
+        if (roleIdNum === 2 || roleIdNum === 4) {
+          const resSchool = await fetch(`${BASE_URL}/School/list`);
+          const textSchool = await resSchool.text();
+
+          if (textSchool.trim().startsWith("<")) {
+            console.error("School fetch returned HTML instead of JSON:", textSchool);
+            return;
+          }
+
+          const schools = JSON.parse(textSchool);
+          const school = schools.find(
+            (s: any) => s.schoolId.toString() === schoolId
+          );
+
+          if (school) {
+            setSchoolName(school.schoolName);
+            if (school.schoolLogo) {
+              setSchoolLogo(`data:image/jpeg;base64,${school.schoolLogo}`);
+            }
           }
         }
+      } catch (err) {
+        console.error("Navbar fetch error:", err);
       }
-    } catch (err) {
-      console.error("Navbar fetch error:", err);
-    }
-  };
+    };
 
-  fetchUserData();
-}, []);
-
+    fetchUserData();
+  }, []);
 
   const handleLogout = () => {
     localStorage.clear();
@@ -352,23 +351,16 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
   const displayedRole =
     roleId === 2 ? "Parent" : roleId === 4 ? "School" : userRole;
 
+  // Render only after mounted to prevent hydration mismatch
+  if (!mounted) return <div className="h-16" />;
+
   return (
     <nav className="bg-card border-b border-border sticky top-0 z-50">
       <div className="h-16 px-6 flex items-center justify-between">
         {/* Logo / School */}
         <div className="flex items-center gap-3">
-          {/* <div className="w-20 h-20 flex items-center justify-center mb-0">
-            <Image
-              src={schoolLogo || LogoImage} // Dynamic logo
-              alt={schoolName}
-              width={60}
-              height={58}
-              className="object-contain rounded-xl border-2 border-gray-300"
-            />
-          </div> */}
           <div>
             <h1 className="text-lg font-bold text-foreground">{schoolName}</h1>
-            {/* <p className="text-xs text-muted-foreground">{schoolName}</p> */}
           </div>
         </div>
 

@@ -1,12 +1,15 @@
+'use client';
 import type React from "react"
 import { Navbar } from "@/components/common/navbar"
 import { Sidebar } from "@/components/common/sidebar"
-
+import { useAuthGuard } from "@/hooks/use-auth-guard";
 export default function ParentLayout({
+
   children,
 }: {
   children: React.ReactNode
 }) {
+  useAuthGuard();
   return (
     <div className="flex h-screen bg-background">
       <Sidebar role="parent" />
