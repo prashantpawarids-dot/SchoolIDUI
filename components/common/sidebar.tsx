@@ -1,5 +1,4 @@
 "use client";
-
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -12,7 +11,7 @@ import {
   Layers,
   BookOpen,
   Printer,
-  LogOut,FileUp 
+  LogOut,FileUp,CreditCard
 } from "lucide-react";
 import { clearAuthData } from "@/lib/auth";
 import Image from "next/image";
@@ -37,6 +36,7 @@ export function Sidebar({ role }: SidebarProps) {
         { href: "/admin/dashboard", label: "Dashboard", icon: BarChart3 },
         { href: "/admin/students", label: "Manage Students", icon: Users },
         { href: "/admin/print", label: "Print ID Cards", icon: Printer },
+        { href: "/admin/print/designer", label: "Card Designer", icon: CreditCard },
         { href: "/admin/export",  label: "Export Data", icon: Download },
         { href: "/admin/school",   label: "School Manage and Academic Year ", icon: Building2 },
         { href: "/admin/classes", label: "Manage Classes", icon: Layers },

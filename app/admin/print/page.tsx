@@ -1,972 +1,1152 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { PageHeader } from "@/components/common/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem,
+  SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Printer, FileDown, User, CreditCard } from "lucide-react";
-import type { Student, School } from "@/lib/types";
+import {
+  Printer, FileDown, User, CreditCard,
+  Settings2, Sun, Contrast, Move,
+  CheckCircle2, XCircle, Loader2,
+  History, X,
+} from "lucide-react";
+import type { Student } from "@/lib/types";
 import { BASE_URL } from "@/lib/api";
+import { buildDesignerPrintHtml } from "./lib/card-renderer";
 
-/* ─────────────────────────────────────────────
-   Helpers
-───────────────────────────────────────────── */
-const toBase64 = (url: string): Promise<string> => {
-  if (!url) return Promise.resolve("");
-
-  return new Promise<string>((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-
-    img.onload = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width  = img.naturalWidth  || img.width;
-        canvas.height = img.naturalHeight || img.height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) { resolve(""); return; }
-        ctx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL("image/jpeg", 0.92));
-      } catch {
-        /* canvas tainted (CORS) – fall back to original URL */
-        resolve(url);
-      }
-    };
-
-    img.onerror = () => {
-      /* crossOrigin anonymous failed – retry without it (uses src directly) */
-      const img2 = new Image();
-      img2.onload  = () => resolve(url);
-      img2.onerror = () => resolve("");
-      img2.src = url + (url.includes("?") ? "&" : "?") + "_nc=" + Date.now();
-    };
-
-    img.src = url + (url.includes("?") ? "&" : "?") + "_cb=" + Date.now();
-  });
+const DEFAULT_CONFIG = {
+  copies: 1,
+  printSide: "Both",
+  orientation: "Portrait",
+  quality: "High",
+  brightness: 0,
+  contrast: 0,
+  offsetX: 0,
+  offsetY: 0,
 };
 
-const fmtDob = (dob: string) =>
-  dob
-    ? new Date(dob).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-      })
-    : "";
-
-/* ─────────────────────────────────────────────
-   Card HTML builder
-   Uses ONLY inline styles + solid colours so
-   backgrounds always render in print / PDF.
-   Each side = 85.6 × 54 mm (CR80 ID-card size)
-───────────────────────────────────────────── */
-function infoCell(label: string, value: string, valColor = "#ffffff") {
-  return `
-    <div style="
-      background:rgba(255,255,255,0.20);
-      -webkit-print-color-adjust:exact;print-color-adjust:exact;
-      border-radius:1.2mm;padding:1.2mm 2mm;text-align:center;
-    ">
-      <div style="font-size:5pt;color:rgba(255,255,255,0.78);margin-bottom:0.5mm;">${label}</div>
-      <div style="font-size:7.5pt;font-weight:700;color:${valColor};">${value}</div>
-    </div>`;
-}
-
-function buildCardHtml(s: Student, sch: School, photo: string) {
-  const DARK  = "#1e3a8a";   /* dark blue header */
-  const MID   = "#1d4ed8";   /* mid blue body    */
-  const W = "85.6mm";
-  const H = "54mm";
-
-  const cardBox = (content: string, bg: string) => `
-    <div style="
-      width:${W};min-width:${W};max-width:${W};
-      height:${H};min-height:${H};max-height:${H};
-      border-radius:3.5mm;overflow:hidden;
-      background:${bg};
-      -webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;
-      font-family:Arial,Helvetica,sans-serif;
-      box-sizing:border-box;
-      display:flex;flex-direction:column;
-      page-break-inside:avoid;break-inside:avoid;
-    ">${content}</div>`;
-
-  /* ── FRONT ── */
-  const front = cardBox(`
-    <!-- HEADER -->
-    <div style="
-      background:${DARK};
-      -webkit-print-color-adjust:exact;print-color-adjust:exact;
-      padding:2.5mm 3mm 2mm;
-      display:flex;align-items:center;justify-content:center;gap:2.5mm;
-      border-bottom:0.5mm solid rgba(255,255,255,0.22);
-    ">
-      <div style="
-        width:9mm;height:9mm;border-radius:50%;
-        background:#ffffff;
-        -webkit-print-color-adjust:exact;print-color-adjust:exact;
-        display:flex;align-items:center;justify-content:center;flex-shrink:0;
-      ">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-             stroke="${DARK}" stroke-width="2.2">
-          <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
-          <path d="M6 12v5c3 3 9 3 12 0v-5"/>
-        </svg>
-      </div>
-      <div>
-        <div style="font-size:7.5pt;font-weight:700;color:#fff;line-height:1.3;">
-          ${sch.schoolName}
-        </div>
-        <div style="font-size:5pt;color:rgba(255,255,255,0.80);letter-spacing:0.7px;">
-          STUDENT IDENTITY CARD
-        </div>
-      </div>
-    </div>
-
-    <!-- BODY -->
-    <div style="
-      background:${MID};
-      -webkit-print-color-adjust:exact;print-color-adjust:exact;
-      flex:1;display:flex;align-items:center;gap:3mm;padding:2.5mm 3mm;
-    ">
-      <!-- photo -->
-      <div style="
-        width:15mm;height:19mm;flex-shrink:0;
-        border-radius:1.5mm;overflow:hidden;
-        background:#ffffff;
-        -webkit-print-color-adjust:exact;print-color-adjust:exact;
-        border:0.6mm solid rgba(255,255,255,0.55);
-      ">
-        ${photo
-          ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;display:block;"/>`
-          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
-               <svg width="22" height="22" viewBox="0 0 24 24" fill="${DARK}">
-                 <circle cx="12" cy="8" r="4"/>
-                 <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-               </svg>
-             </div>`
-        }
-      </div>
-
-      <!-- info -->
-      <div style="flex:1;">
-        <div style="font-size:9.5pt;font-weight:700;color:#fff;margin-bottom:2.5mm;line-height:1.2;">
-          ${s.fullName || ""}
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5mm;">
-          ${infoCell("Class",  `${s.className || ""}&#8209;${s.divisionName || ""}`)}
-          ${infoCell("Roll No", String(s.rollNo || ""))}
-          ${infoCell("Blood",  s.bloodGroup || "", "#fde047")}
-          ${infoCell("DOB",    fmtDob(s.dob))}
-        </div>
-      </div>
-    </div>
-  `, MID);
-
-  /* ── BACK ── */
-  const back = cardBox(`
-    <div style="
-      padding:3mm;height:100%;
-      background:#f1f5f9;
-      -webkit-print-color-adjust:exact;print-color-adjust:exact;
-      display:flex;flex-direction:column;
-    ">
-      <div style="font-size:8.5pt;font-weight:700;color:${DARK};margin-bottom:1mm;">
-        ${sch.schoolName}
-      </div>
-      <div style="
-        font-size:6pt;color:#64748b;margin-bottom:2mm;
-        overflow:hidden;display:-webkit-box;
-        -webkit-line-clamp:2;-webkit-box-orient:vertical;
-      ">${sch.schoolAddress || ""}</div>
-
-      <!-- emergency -->
-      <div style="
-        display:flex;align-items:center;gap:2.5mm;
-        padding:2mm 0;
-        border-top:0.4mm solid #cbd5e1;
-        border-bottom:0.4mm solid #cbd5e1;
-        margin-bottom:3mm;
-      ">
-        <div style="
-          width:10mm;height:10mm;flex-shrink:0;border-radius:1.5mm;
-          background:${DARK};
-          -webkit-print-color-adjust:exact;print-color-adjust:exact;
-          display:flex;align-items:center;justify-content:center;
-        ">
-          <svg width="15" height="15" viewBox="0 0 24 24"
-               fill="none" stroke="#fff" stroke-width="1.8">
-            <rect x="3" y="3" width="7" height="7"/>
-            <rect x="14" y="3" width="7" height="7"/>
-            <rect x="3" y="14" width="7" height="7"/>
-            <rect x="14" y="14" width="3" height="3"/>
-          </svg>
-        </div>
-        <div>
-          <div style="font-size:6.5pt;font-weight:700;color:${DARK};">Emergency Contact</div>
-          <div style="font-size:6pt;color:#1e293b;">${s.parentName || ""}</div>
-          <div style="font-size:6pt;color:#64748b;">${s.emergencyContact || ""}</div>
-        </div>
-      </div>
-
-      <!-- signatures -->
-      <div style="display:flex;justify-content:space-between;padding:0 4mm;margin-top:auto;">
-        <div style="text-align:center;">
-          <div style="width:22mm;border-bottom:0.5mm solid ${DARK};margin-bottom:1.2mm;"></div>
-          <div style="font-size:5.5pt;color:#64748b;">Parent Signature</div>
-        </div>
-        <div style="text-align:center;">
-          <div style="width:22mm;border-bottom:0.5mm solid ${DARK};margin-bottom:1.2mm;"></div>
-          <div style="font-size:5.5pt;color:#64748b;">Principal Signature</div>
-        </div>
-      </div>
-    </div>
-  `, "#f1f5f9");
-
-  return { front, back };
-}
-
-/* ─────────────────────────────────────────────
-   Print HTML wrapper
-───────────────────────────────────────────── */
-function buildPrintHtml(cardsHtml: string) {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8"/>
-  <title>Student ID Cards</title>
-  <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-    html,body{
-      background:#fff;
-      -webkit-print-color-adjust:exact;
-      print-color-adjust:exact;
-      color-adjust:exact;
-    }
-    body{padding:6mm;}
-    .grid{display:flex;flex-wrap:wrap;gap:4mm;}
-    .pair{display:flex;gap:3mm;page-break-inside:avoid;break-inside:avoid;}
-    @page{size:A4 landscape;margin:6mm;}
-    @media print{
-      body{padding:0;}
-      *{
-        -webkit-print-color-adjust:exact!important;
-        print-color-adjust:exact!important;
-        color-adjust:exact!important;
-      }
-    }
-  </style>
-</head>
-<body onload="setTimeout(()=>window.print(),800)">
-  <div class="grid">${cardsHtml}</div>
-</body>
-</html>`;
-}
-
-/* ─────────────────────────────────────────────
-   Preview Card – JSX matching the print output
-───────────────────────────────────────────── */
-// function PreviewIDCard({ student, school }: { student: Student; school: School }) {
-//   const DARK = "#1e3a8a";
-//   const MID  = "#1d4ed8";
-
-//   return (
-//     <div style={{ fontFamily: "Arial,Helvetica,sans-serif", width: "100%" }}>
-//       {/* ── Front ── */}
-//       <div style={{ borderRadius: 8, overflow: "hidden", boxShadow: "0 4px 16px rgba(0,0,0,0.22)", marginBottom: 8 }}>
-//         {/* header */}
-//         <div style={{
-//           background: DARK, display: "flex", alignItems: "center",
-//           justifyContent: "center", gap: 8, padding: "8px 10px 7px",
-//           borderBottom: "1px solid rgba(255,255,255,0.22)",
-//         }}>
-//           <div style={{
-//             width: 28, height: 28, borderRadius: "50%", background: "#fff",
-//             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-//           }}>
-//             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={DARK} strokeWidth="2.2">
-//               <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
-//               <path d="M6 12v5c3 3 9 3 12 0v-5" />
-//             </svg>
-//           </div>
-//           <div>
-//             <div style={{ fontSize: 10.5, fontWeight: 700, color: "#fff", lineHeight: 1.3 }}>{school.schoolName}</div>
-//             <div style={{ fontSize: 7, color: "rgba(255,255,255,0.80)", letterSpacing: 0.7 }}>STUDENT IDENTITY CARD</div>
-//           </div>
-//         </div>
-
-//         {/* body */}
-//         <div style={{
-//           background: MID, display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
-//         }}>
-//           {/* photo */}
-//           <div style={{
-//             width: 44, height: 55, flexShrink: 0, borderRadius: 4,
-//             overflow: "hidden", background: "#fff", border: "2px solid rgba(255,255,255,0.55)",
-//           }}>
-//             {student.photoPath
-//               // eslint-disable-next-line @next/next/no-img-element
-//               ? <img src={student.photoPath} alt={student.fullName} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-//               : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-//                   <svg width="24" height="24" viewBox="0 0 24 24" fill={DARK}>
-//                     <circle cx="12" cy="8" r="4" />
-//                     <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-//                   </svg>
-//                 </div>
-//             }
-//           </div>
-
-//           {/* info */}
-//           <div style={{ flex: 1 }}>
-//             <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", marginBottom: 6, lineHeight: 1.2 }}>
-//               {student.fullName}
-//             </div>
-//             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-//               {([
-//                 ["Class",  `${student.className}-${student.divisionName}`, "#fff"],
-//                 ["Roll No", String(student.rollNo || ""), "#fff"],
-//                 ["Blood",  student.bloodGroup || "", "#fde047"],
-//                 ["DOB",    fmtDob(student.dob), "#fff"],
-//               ] as [string, string, string][]).map(([lbl, val, clr]) => (
-//                 <div key={lbl} style={{
-//                   background: "rgba(255,255,255,0.20)", borderRadius: 3,
-//                   padding: "3px 6px", textAlign: "center",
-//                 }}>
-//                   <div style={{ fontSize: 7, color: "rgba(255,255,255,0.78)", marginBottom: 1 }}>{lbl}</div>
-//                   <div style={{ fontSize: 9, fontWeight: 700, color: clr }}>{val}</div>
-//                 </div>
-//               ))}
-//             </div>
-//           </div>
-//         </div>
-//       </div>
-
-//       {/* ── Back ── */}
-//       <div style={{
-//         borderRadius: 8, overflow: "hidden",
-//         boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
-//         background: "#f1f5f9", padding: "8px 10px",
-//       }}>
-//         <div style={{ fontSize: 9.5, fontWeight: 700, color: DARK, marginBottom: 2 }}>{school.schoolName}</div>
-//         <div style={{
-//           fontSize: 7, color: "#64748b", marginBottom: 7,
-//           overflow: "hidden", display: "-webkit-box",
-//           WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const,
-//         }}>{school.schoolAddress}</div>
-
-//         <div style={{
-//           display: "flex", alignItems: "center", gap: 8,
-//           padding: "5px 0", borderTop: "1px solid #cbd5e1", borderBottom: "1px solid #cbd5e1", marginBottom: 8,
-//         }}>
-//           <div style={{
-//             width: 28, height: 28, flexShrink: 0, borderRadius: 4,
-//             background: DARK, display: "flex", alignItems: "center", justifyContent: "center",
-//           }}>
-//             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8">
-//               <rect x="3" y="3" width="7" height="7" />
-//               <rect x="14" y="3" width="7" height="7" />
-//               <rect x="3" y="14" width="7" height="7" />
-//               <rect x="14" y="14" width="3" height="3" />
-//             </svg>
-//           </div>
-//           <div>
-//             <div style={{ fontSize: 7.5, fontWeight: 700, color: DARK }}>Emergency Contact</div>
-//             <div style={{ fontSize: 7, color: "#1e293b" }}>{student.parentName}</div>
-//             <div style={{ fontSize: 7, color: "#64748b" }}>{student.emergencyContact}</div>
-//           </div>
-//         </div>
-
-//         <div style={{ display: "flex", justifyContent: "space-between", padding: "0 8px" }}>
-//           {["Parent Signature", "Principal Signature"].map((lbl) => (
-//             <div key={lbl} style={{ textAlign: "center" }}>
-//               <div style={{ width: 62, borderBottom: `1px solid ${DARK}`, marginBottom: 2 }} />
-//               <div style={{ fontSize: 7, color: "#64748b" }}>{lbl}</div>
-//             </div>
-//           ))}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
-function PreviewIDCard({
-  student,
-  school,
-}: {
-  student: Student;
-  school: any;
+function CompactIDCard({ student, school, side = "front" }: {
+  student: Student; school: any; side?: "front" | "back"
 }) {
   const hasFront = !!school.cardTemplateFront;
-  const hasBack = !!school.cardTemplateBack;
+  const hasBack  = !!school.cardTemplateBack;
 
-  return (
-    <div className="overflow-hidden shadow-lg bg-white text-[10px] w-full max-w-50 mx-auto">
-
-      {/* ── FRONT SIDE ── */}
+  if (side === "front") return (
+    <div className="overflow-hidden shadow-md rounded-lg bg-white w-full">
       {hasFront ? (
-        // ✅ Template mode — ONLY template image + student data, nothing else
-        <div className="relative overflow-hidden" style={{ minHeight: "200px" }}>
-          <img
-            src={`data:image/png;base64,${school.cardTemplateFront}`}
-            className="w-full h-full object-cover"
-            alt="Card Front"
-            style={{ display: "block" }}
-          />
-          {/* Student data positioned over template */}
+        <div className="relative overflow-hidden" style={{ minHeight: 200 }}>
+          <img src={`data:image/png;base64,${school.cardTemplateFront}`}
+            className="w-full h-full object-cover" style={{ display: "block" }} alt="Front" />
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 p-2">
             <div className="w-12 h-14 rounded overflow-hidden border-2 border-white mt-8">
-              <img
-                src={student.photoPath || "/placeholder.svg?height=56&width=48"}
-                alt={student.fullName}
-                className="w-full h-full object-cover"
-              />
+              <img src={student.photoPath || "/placeholder.svg"} alt={student.fullName}
+                className="w-full h-full object-cover" />
             </div>
             <p className="font-bold text-[10px] text-center text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-              {student.fullName}
-            </p>
-            <div className="flex gap-2 text-white text-[8px]">
-              <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                {student.className}-{student.divisionName}
-              </span>
-              <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                Roll: {student.rollNo}
-              </span>
-            </div>
-            <div className="flex gap-2 text-white text-[8px]">
-              <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                DOB: {new Date(student.dob).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-              </span>
-              <span className="text-yellow-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                {student.bloodGroup}
-              </span>
-            </div>
+              {student.fullName}</p>
+            <p className="text-white text-[8px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+              {student.className}-{student.divisionName} | Roll: {student.rollNo}</p>
+            <p className="text-white text-[8px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+              DOB: {new Date(student.dob).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+              &nbsp;<span className="text-yellow-300">{student.bloodGroup}</span></p>
           </div>
         </div>
       ) : (
-        // Fallback — original design when no template
         <div className="bg-gradient-to-br from-blue-700 to-blue-500 text-white p-2.5">
           <div className="text-center border-b border-white/20 pb-2 mb-2">
             <div className="w-8 h-8 bg-white rounded-full mx-auto mb-1 flex items-center justify-center">
-              {school.schoolLogo ? (
-                <img src={`data:image/png;base64,${school.schoolLogo}`} className="w-full h-full object-cover rounded-full" alt="Logo" />
-              ) : (
-                <svg className="w-5 h-5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
-                  <path d="M6 12v5c3 3 9 3 12 0v-5" />
-                </svg>
-              )}
+              {school.schoolLogo
+                ? <img src={`data:image/png;base64,${school.schoolLogo}`}
+                    className="w-full h-full object-cover rounded-full" alt="Logo" />
+                : <svg className="w-5 h-5 text-blue-700" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2">
+                    <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                    <path d="M6 12v5c3 3 9 3 12 0v-5" />
+                  </svg>}
             </div>
             <p className="font-bold text-[9px]">{school.schoolName}</p>
             <p className="text-[6px] opacity-80 tracking-wider">STUDENT IDENTITY CARD</p>
           </div>
           <div className="text-center mb-2">
             <div className="w-10 h-12 bg-white rounded mx-auto mb-1 overflow-hidden border border-white/30">
-              <img src={student.photoPath || "/placeholder.svg?height=48&width=40"} alt={student.fullName} className="w-full h-full object-cover" />
+              <img src={student.photoPath || "/placeholder.svg"} alt={student.fullName}
+                className="w-full h-full object-cover" />
             </div>
             <p className="font-bold text-[11px]">{student.fullName}</p>
           </div>
           <div className="grid grid-cols-2 gap-1">
-            <div className="bg-white/15 rounded px-1.5 py-1 text-center">
-              <span className="block text-[6px] opacity-75">Class</span>
-              <span className="font-semibold text-[8px]">{student.className}-{student.divisionName}</span>
-            </div>
-            <div className="bg-white/15 rounded px-1.5 py-1 text-center">
-              <span className="block text-[6px] opacity-75">Roll No</span>
-              <span className="font-semibold text-[8px]">{student.rollNo}</span>
-            </div>
-            <div className="bg-white/15 rounded px-1.5 py-1 text-center">
-              <span className="block text-[6px] opacity-75">Blood</span>
-              <span className="font-semibold text-[8px] text-yellow-300">{student.bloodGroup}</span>
-            </div>
-            <div className="bg-white/15 rounded px-1.5 py-1 text-center">
-              <span className="block text-[6px] opacity-75">DOB</span>
-              <span className="font-semibold text-[8px]">
-                {new Date(student.dob).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
-              </span>
-            </div>
+            {[
+              ["Class", `${student.className}-${student.divisionName}`, "#fff"],
+              ["Roll No", String(student.rollNo || ""), "#fff"],
+              ["Blood", student.bloodGroup || "", "#fde047"],
+              ["DOB", new Date(student.dob).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }), "#fff"],
+            ].map(([lbl, val, clr]) => (
+              <div key={String(lbl)} className="bg-white/15 rounded px-1.5 py-1 text-center">
+                <span className="block text-[6px] opacity-75">{lbl}</span>
+                <span className="font-semibold text-[8px]" style={{ color: String(clr) }}>{val}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
+    </div>
+  );
 
-      {/* ── BACK SIDE ── */}
+  return (
+    <div className="overflow-hidden shadow-md rounded-lg bg-white w-full">
       {hasBack ? (
-        // ✅ Template mode — ONLY template image + emergency data, nothing else
-        <div className="relative overflow-hidden" style={{ minHeight: "120px" }}>
-          <img
-            src={`data:image/png;base64,${school.cardTemplateBack}`}
-            className="w-full h-full object-cover"
-            alt="Card Back"
-            style={{ display: "block" }}
-          />
-          {/* Only emergency + signatures over template */}
+        <div className="relative overflow-hidden" style={{ minHeight: 120 }}>
+          <img src={`data:image/png;base64,${school.cardTemplateBack}`}
+            className="w-full h-full object-cover" style={{ display: "block" }} alt="Back" />
           <div className="absolute inset-0 flex flex-col justify-end p-2 gap-1">
-            <div className="text-[7px] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-              <p className="font-semibold">Emergency: {student.parentName}</p>
-              <p>{student.emergencyContact}</p>
-            </div>
-            <div className="flex justify-between items-end">
+            <p className="text-[7px] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] font-semibold">
+              Emergency: {student.parentName}</p>
+            <p className="text-[6px] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+              {student.emergencyContact}</p>
+            <div className="flex justify-between items-end mt-1">
               <div className="text-center">
                 <div className="w-10 border-b border-white/70 mb-0.5" />
-                <span className="text-[6px] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">Parent</span>
+                <span className="text-[6px] text-white">Parent</span>
               </div>
               <div className="text-center">
-                {school.principalSignature && (
-                  <img
-                    src={`data:image/png;base64,${school.principalSignature}`}
-                    className="h-4 object-contain mx-auto mb-0.5"
-                    alt="Signature"
-                  />
-                )}
+                {school.principalSignature &&
+                  <img src={`data:image/png;base64,${school.principalSignature}`}
+                    className="h-4 object-contain mx-auto mb-0.5" alt="Sig" />}
                 <div className="w-10 border-b border-white/70 mb-0.5" />
-                <span className="text-[6px] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">Principal</span>
+                <span className="text-[6px] text-white">Principal</span>
               </div>
             </div>
           </div>
         </div>
       ) : (
-        // Fallback — original back design when no template
         <div className="bg-slate-50 p-2.5 text-[8px]">
-          <p className="font-bold text-primary text-[8px] mb-1">{school.schoolName}</p>
-          <p className="text-muted-foreground text-[7px] mb-2 line-clamp-2">{school.schoolAddress}</p>
-          <div className="flex items-center gap-2 py-1.5 border-t border-b border-border mb-1.5">
-            <div className="w-8 h-8 bg-primary rounded flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <p className="font-bold text-blue-700 text-[8px] mb-1">{school.schoolName}</p>
+          <p className="text-slate-500 text-[7px] mb-2 line-clamp-2">{school.schoolAddress}</p>
+          <div className="flex items-center gap-2 py-1.5 border-t border-b border-slate-200 mb-1.5">
+            <div className="w-8 h-8 bg-blue-700 rounded flex items-center justify-center shrink-0">
+              <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="1.5">
                 <rect x="3" y="3" width="7" height="7" />
                 <rect x="14" y="3" width="7" height="7" />
                 <rect x="3" y="14" width="7" height="7" />
                 <rect x="14" y="14" width="3" height="3" />
               </svg>
             </div>
-            <div className="text-[7px]">
-              <p className="font-semibold text-primary">Emergency</p>
-              <p className="text-foreground">{student.parentName}</p>
-              <p className="text-muted-foreground">{student.emergencyContact}</p>
+            <div>
+              <p className="font-semibold text-blue-700 text-[7px]">Emergency</p>
+              <p className="text-[7px]">{student.parentName}</p>
+              <p className="text-slate-500 text-[7px]">{student.emergencyContact}</p>
             </div>
           </div>
           <div className="flex justify-between">
             <div className="text-center">
-              <div className="w-10 border-b border-primary mb-0.5" />
-              <span className="text-[6px] text-muted-foreground">Parent</span>
+              <div className="w-10 border-b border-blue-700 mb-0.5" />
+              <span className="text-[6px] text-slate-400">Parent</span>
             </div>
             <div className="text-center">
-              {school.principalSignature && (
-                <img src={`data:image/png;base64,${school.principalSignature}`} className="h-4 object-contain mx-auto mb-0.5" alt="Signature" />
-              )}
-              <div className="w-10 border-b border-primary mb-0.5" />
-              <span className="text-[6px] text-muted-foreground">Principal</span>
+              {school.principalSignature &&
+                <img src={`data:image/png;base64,${school.principalSignature}`}
+                  className="h-4 object-contain mx-auto mb-0.5" alt="Sig" />}
+              <div className="w-10 border-b border-blue-700 mb-0.5" />
+              <span className="text-[6px] text-slate-400">Principal</span>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Main Page
-───────────────────────────────────────────── */
-export default function PrintIDCards() {
-  const [schools, setSchools]           = useState<any[]>([]);
-  const [years, setYears]               = useState<any[]>([]);
-  const [classes, setClasses]           = useState<any[]>([]);
-  const [divisions, setDivisions]       = useState<any[]>([]);
-  const [students, setStudents]         = useState<Student[]>([]);
-  const [filteredStudents, setFiltered] = useState<Student[]>([]);
-  const [selectedSchool, setSelSchool]  = useState("all");
-  const [selectedYear, setSelYear]      = useState("all");
-  const [selectedClass, setSelClass]    = useState("all");
-  const [selectedDiv, setSelDiv]        = useState("all");
-  const [selectedIds, setSelectedIds]   = useState<number[]>([]);
-  const [isPrinting, setIsPrinting]     = useState(false);
+function Slider({ label, value, min, max, unit = "", icon, onChange }: {
+  label: string; value: number; min: number; max: number;
+  unit?: string; icon?: React.ReactNode; onChange: (v: number) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex justify-between items-center">
+        <span className="text-xs font-medium text-slate-600 flex items-center gap-1.5">
+          {icon}{label}
+        </span>
+        <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+          {value > 0 ? `+${value}` : value}{unit}
+        </span>
+      </div>
+      <input
+        type="range" min={min} max={max} value={value}
+        onChange={e => onChange(Number(e.target.value))}
+        className="w-full h-1.5 bg-slate-200 rounded-full appearance-none cursor-pointer
+          [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4
+          [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full
+          [&::-webkit-slider-thumb]:bg-blue-600 [&::-webkit-slider-thumb]:cursor-pointer
+          [&::-webkit-slider-thumb]:shadow-sm"
+      />
+      <div className="flex justify-between text-[10px] text-slate-400">
+        <span>{min}{unit}</span><span>0</span><span>+{max}{unit}</span>
+      </div>
+    </div>
+  );
+}
 
-  useEffect(() => { loadSchools(); loadStudents(); }, []);
+function ToggleGroup({ options, value, onChange }: {
+  options: { label: string; value: string; icon?: React.ReactNode }[];
+  value: string; onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+      {options.map((opt) => (
+        <button key={opt.value} onClick={() => onChange(opt.value)}
+          className={`flex-1 py-1.5 text-xs font-medium flex items-center justify-center gap-1
+            transition-all border-r last:border-r-0 border-slate-200
+            ${value === opt.value
+              ? "bg-blue-600 text-white shadow-inner"
+              : "bg-white text-slate-600 hover:bg-slate-50"}`}>
+          {opt.icon}{opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export default function PrintIDCards() {
+  /* ── Data state ── */
+  const [schools, setSchools]     = useState<any[]>([]);
+  const [years, setYears]         = useState<any[]>([]);
+  const [classes, setClasses]     = useState<any[]>([]);
+  const [divisions, setDivisions] = useState<any[]>([]);
+  const [students, setStudents]   = useState<Student[]>([]);
+  const [filtered, setFiltered]   = useState<Student[]>([]);
+
+  /* ── Filter state ── */
+  const [selSchool, setSelSchool] = useState("all");
+  const [selYear, setSelYear]     = useState("all");
+  const [selClass, setSelClass]   = useState("all");
+  const [selDiv, setSelDiv]       = useState("all");
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+  /* ── Print panel state ── */
+  const [showPanel, setShowPanel]         = useState(false);
+  const [printConfig, setPrintConfig]     = useState({ ...DEFAULT_CONFIG });
+  const [printerStatus, setPrinterStatus] = useState<any>(null);
+
+  /* ── Job tracking state ── */
+  const [currentJob, setCurrentJob]       = useState<any>(null);
+  const [showProgress, setShowProgress]   = useState(false);
+  const [jobHistory, setJobHistory]       = useState<any[]>([]);
+  const [showHistory, setShowHistory]     = useState(false);
+  const [isSending, setIsSending]         = useState(false);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
+
+  /* ── Designer template state ── */
+  const [designerTemplates, setDesignerTemplates] = useState<any[]>([]);
+  const [selectedTemplate, setSelectedTemplate]   = useState<any>(null);
+
+  /* ── Load data ── */
+  useEffect(() => {
+    loadSchools();
+    loadStudents();
+    loadHistory();
+    loadDesignerTemplates();
+  }, []);
 
   const loadSchools = async () => {
-    const data = await fetch(`${BASE_URL}/School/list`).then((r) => r.json());
+    const data = await fetch(`${BASE_URL}/School/list`).then(r => r.json());
     setSchools(data || []);
   };
 
   const loadStudents = async () => {
-    const all: Student[] = await fetch(`${BASE_URL}/Student/getall`).then((r) => r.json());
+    const all: Student[] = await fetch(`${BASE_URL}/Student/getall`).then(r => r.json());
     const accepted: Student[] = [];
     for (const s of all) {
       if (!s.studentId) continue;
-      const apps = await fetch(`${BASE_URL}/Student/applications/student/${s.studentId}`).then((r) => r.json());
+      const apps = await fetch(`${BASE_URL}/Student/applications/student/${s.studentId}`).then(r => r.json());
       if (apps?.length && apps[0]?.status === "accept") accepted.push(s);
     }
     setStudents(accepted);
     setFiltered(accepted);
-    const cls = Array.from(
-      new Map(accepted.map((s) => [s.classId, { classId: s.classId, className: s.className }])).values()
-    );
-    setClasses(cls);
+    setClasses(Array.from(new Map(accepted.map(s =>
+      [s.classId, { classId: s.classId, className: s.className }]
+    )).values()));
   };
 
+  const loadHistory = async () => {
+    try {
+      const data = await fetch(`${BASE_URL}/Print/jobs`).then(r => r.json());
+      setJobHistory(data || []);
+    } catch { /* ignore */ }
+  };
+
+  /* ── Load designer templates ── */
+  const loadDesignerTemplates = async () => {
+    try {
+      const schoolId = Number(localStorage.getItem("schoolId")) || 0;
+      const param = schoolId ? `?schoolId=${schoolId}` : "";
+      const data = await fetch(`${BASE_URL}/CardTemplate/list${param}`)
+        .then(r => r.json());
+      setDesignerTemplates(data || []);
+    } catch { /* ignore */ }
+  };
+
+  /* ── Printer status ── */
+  const fetchPrinterStatus = useCallback(async () => {
+    try {
+      const data = await fetch(`${BASE_URL}/Print/printerstatus`).then(r => r.json());
+      setPrinterStatus(data);
+    } catch {
+      setPrinterStatus({ isOnline: false, status: "Offline", printerName: "Unknown" });
+    }
+  }, []);
+
   useEffect(() => {
-    if (selectedSchool !== "all") {
-      fetch(`${BASE_URL}/School/academicyear/${selectedSchool}`).then((r) => r.json()).then(setYears);
-      fetch(`${BASE_URL}/ClassDivision/getclasses?schoolId=${selectedSchool}`).then((r) => r.json()).then(setClasses);
+    if (showPanel) { fetchPrinterStatus(); }
+  }, [showPanel, fetchPrinterStatus]);
+
+  /* ── Filter cascades ── */
+  useEffect(() => {
+    if (selSchool !== "all") {
+      fetch(`${BASE_URL}/School/academicyear/${selSchool}`).then(r => r.json()).then(setYears);
+      fetch(`${BASE_URL}/ClassDivision/getclasses?schoolId=${selSchool}`).then(r => r.json()).then(setClasses);
     } else { setYears([]); setClasses([]); setDivisions([]); }
-  }, [selectedSchool]);
+  }, [selSchool]);
 
   useEffect(() => {
-    if (selectedClass !== "all") {
-      fetch(`${BASE_URL}/ClassDivision/getdivisions?classId=${selectedClass}`).then((r) => r.json()).then(setDivisions);
+    if (selClass !== "all") {
+      fetch(`${BASE_URL}/ClassDivision/getdivisions?classId=${selClass}`).then(r => r.json()).then(setDivisions);
     } else { setDivisions([]); }
-  }, [selectedClass]);
+  }, [selClass]);
 
   useEffect(() => {
-    const data = students.filter((s) => {
-      if (selectedSchool !== "all" && s.schoolId?.toString()       !== selectedSchool) return false;
-      if (selectedYear   !== "all" && s.academicYearId?.toString() !== selectedYear)   return false;
-      if (selectedClass  !== "all" && s.classId?.toString()        !== selectedClass)  return false;
-      if (selectedDiv    !== "all" && s.divisionId?.toString()     !== selectedDiv)    return false;
+    setFiltered(students.filter(s => {
+      if (selSchool !== "all" && s.schoolId?.toString()       !== selSchool) return false;
+      if (selYear   !== "all" && s.academicYearId?.toString() !== selYear)   return false;
+      if (selClass  !== "all" && s.classId?.toString()        !== selClass)  return false;
+      if (selDiv    !== "all" && s.divisionId?.toString()     !== selDiv)    return false;
       return true;
-    });
-    setFiltered(data);
+    }));
     setSelectedIds([]);
-  }, [selectedSchool, selectedYear, selectedClass, selectedDiv, students]);
+  }, [selSchool, selYear, selClass, selDiv, students]);
 
+  /* ── Selection ── */
   const toggle = (id: number) =>
-    setSelectedIds((p) => p.includes(id) ? p.filter((i) => i !== id) : [...p, id]);
+    setSelectedIds(p => p.includes(id) ? p.filter(i => i !== id) : [...p, id]);
 
   const toggleAll = () =>
-    setSelectedIds(selectedIds.length === filteredStudents.length ? [] : filteredStudents.map((s) => s.studentId!));
+    setSelectedIds(selectedIds.length === filtered.length ? [] : filtered.map(s => s.studentId!));
 
-  // const handlePrint = async () => {
-  //   const selected = filteredStudents.filter((s) => selectedIds.includes(s.studentId!));
-  //   if (!selected.length) return;
-  //   setIsPrinting(true);
-  //   try {
-  //     const photoMap: Record<number, string> = {};
-  //     await Promise.all(
-  //       selected.map(async (s) => {
-  //         if (s.photoPath) photoMap[s.studentId!] = await toBase64(s.photoPath);
-  //       })
-  //     );
-  //     const cardsHtml = selected.map((s) => {
-  //       const sch = schools.find((sc) => sc.schoolId === s.schoolId);
-  //       if (!sch) return "";
-  //       const { front, back } = buildCardHtml(s, sch, photoMap[s.studentId!] || "");
-  //       return `<div class="pair">${front}${back}</div>`;
-  //     }).join("\n");
+  /* ── Job progress polling ── */
+  const startPolling = (jobId: number) => {
+    pollRef.current = setInterval(async () => {
+      try {
+        const data = await fetch(`${BASE_URL}/Print/jobstatus/${jobId}`).then(r => r.json());
+        setCurrentJob(data);
+        if (data.status === "Completed" || data.status === "Failed") {
+          clearInterval(pollRef.current!);
+          loadHistory();
+        }
+      } catch { clearInterval(pollRef.current!); }
+    }, 2000);
+  };
 
-  //     const win = window.open("", "_blank");
-  //     if (!win) { alert("Allow popups for this site to print."); return; }
-  //     win.document.write(buildPrintHtml(cardsHtml));
-  //     win.document.close();
-  //   } finally {
-  //     setIsPrinting(false);
-  //   }
-  // };
-  const handlePrint = () => {
-  const selected = filteredStudents.filter((s) =>
-    selectedIds.includes(s.studentId!)
-  );
-  if (!selected.length) return;
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
-  const win = window.open("", "_blank");
-  if (!win) return;
+  /* ── Open browser print ── */
+  const openBrowserPrint = (side: string) => {
+    const selected = filtered.filter(s => selectedIds.includes(s.studentId!));
+    if (!selected.length) return;
 
-  const buildCardHtml = (s: Student) => {
-    const school = schools.find((sch) => sch.schoolId === s.schoolId);
-    if (!school) return "";
+    const win = window.open("", "_blank");
+    if (!win) return;
 
-    const hasFront = !!school.cardTemplateFront;
-    const hasBack = !!school.cardTemplateBack;
+    /* ── ✅ Designer template mode ── */
+    if (selectedTemplate) {
+      try {
+        const frontElements = JSON.parse(selectedTemplate.frontElements || "[]");
+        const backElements  = JSON.parse(selectedTemplate.backElements  || "[]");
+        const school = schools.find(sc => sc.schoolId === selected[0].schoolId) || schools[0] || {};
 
-    const dob = new Date(s.dob).toLocaleDateString("en-IN", {
-      day: "2-digit", month: "short", year: "numeric",
-    });
+        const html = buildDesignerPrintHtml(
+          selected, school,
+          frontElements, backElements,
+          Number(selectedTemplate.cardWidth),
+          Number(selectedTemplate.cardHeight),
+          selectedTemplate.backgroundColor || "#1d4ed8",
+          selectedTemplate.backgroundImage || undefined,
+          selectedTemplate.orientation || "portrait",
+          side,
+          printConfig.brightness,
+          printConfig.contrast,
+          printConfig.copies,
+        );
 
-    const frontHtml = hasFront
-      ? `<div style="position:relative;overflow:hidden;min-height:200px;">
-          <img src="data:image/png;base64,${school.cardTemplateFront}"
-            style="width:100%;height:100%;object-fit:cover;display:block;" />
-          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px;">
-            <div style="width:48px;height:56px;border-radius:4px;overflow:hidden;border:2px solid rgba(255,255,255,0.8);margin-top:30px;">
-              <img src="${s.photoPath || ''}" style="width:100%;height:100%;object-fit:cover;" />
+        win.document.write(html);
+        win.document.close();
+        return;
+      } catch (e) {
+        console.error("Template render error:", e);
+        // fallback to default below
+      }
+    }
+
+    /* ── Default print ── */
+    const isLandscape = printConfig.orientation === "Landscape";
+    const cardW = isLandscape ? "85.6mm" : "54mm";
+    const cardH = isLandscape ? "54mm"   : "85.6mm";
+    const brightnessVal = `brightness(${1 + printConfig.brightness / 100})`;
+    const contrastVal   = `contrast(${1 + printConfig.contrast / 100})`;
+
+    const cardsHtml = selected.map(s => {
+      const school = schools.find(sc => sc.schoolId === s.schoolId);
+      if (!school) return "";
+      const hasFront = !!school.cardTemplateFront;
+      const hasBack  = !!school.cardTemplateBack;
+      const dob = s.dob
+        ? new Date(s.dob).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+        : "";
+      const showFront = side === "Front" || side === "Both";
+      const showBack  = side === "Back"  || side === "Both";
+
+      const frontHtml = showFront ? (hasFront
+        ? `<div style="position:relative;width:${cardW};height:${cardH};overflow:hidden;">
+            <img src="data:image/png;base64,${school.cardTemplateFront}"
+              style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;" />
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;
+              align-items:center;justify-content:center;gap:3px;padding:6px;">
+              <div style="width:${isLandscape ? "36px" : "42px"};height:${isLandscape ? "42px" : "52px"};
+                border-radius:3px;overflow:hidden;border:1.5px solid rgba(255,255,255,0.85);
+                margin-top:${isLandscape ? "0" : "24px"};">
+                <img src="${s.photoPath || ''}" style="width:100%;height:100%;object-fit:cover;" />
+              </div>
+              <p style="font-weight:bold;font-size:${isLandscape ? "8px" : "9px"};color:#fff;
+                text-align:center;text-shadow:0 1px 3px rgba(0,0,0,0.95);margin:1px 0 0;">${s.fullName}</p>
+              <p style="font-size:7px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.9);margin:0;">
+                ${s.className}-${s.divisionName} | Roll: ${s.rollNo}</p>
+              <p style="font-size:7px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.9);margin:0;">
+                DOB: ${dob} | <span style="color:#fde047;">${s.bloodGroup}</span></p>
             </div>
-            <p style="font-weight:bold;font-size:10px;color:#fff;text-align:center;text-shadow:0 1px 3px rgba(0,0,0,0.9);margin:2px 0;">
-              ${s.fullName}
-            </p>
-            <p style="font-size:8px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.9);margin:1px 0;">
-              ${s.className}-${s.divisionName} &nbsp;|&nbsp; Roll: ${s.rollNo}
-            </p>
-            <p style="font-size:8px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.9);margin:1px 0;">
-              DOB: ${dob} &nbsp;|&nbsp; <span style="color:#fde047;">${s.bloodGroup}</span>
-            </p>
-          </div>
-        </div>`
-      : `<div style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;padding:10px;">
-          <div style="text-align:center;border-bottom:1px solid rgba(255,255,255,0.3);padding-bottom:6px;margin-bottom:6px;">
-            ${school.schoolLogo
-              ? `<img src="data:image/png;base64,${school.schoolLogo}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;margin:0 auto 3px;" />`
-              : `<div style="width:28px;height:28px;background:#fff;border-radius:50%;margin:0 auto 3px;"></div>`}
-            <p style="font-weight:bold;font-size:9px;margin:1px 0;">${school.schoolName}</p>
-            <p style="font-size:6px;opacity:0.8;letter-spacing:1px;">STUDENT IDENTITY CARD</p>
-          </div>
-          <div style="text-align:center;margin-bottom:6px;">
-            <div style="width:38px;height:46px;background:#fff;border-radius:3px;overflow:hidden;margin:0 auto 3px;border:1px solid rgba(255,255,255,0.4);">
-              <img src="${s.photoPath || ''}" style="width:100%;height:100%;object-fit:cover;" />
+          </div>`
+        : `<div style="width:${cardW};height:${cardH};
+            background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;
+            display:flex;flex-direction:column;overflow:hidden;
+            padding:6px;box-sizing:border-box;">
+            <div style="text-align:center;border-bottom:1px solid rgba(255,255,255,0.3);
+              padding-bottom:4px;margin-bottom:4px;">
+              ${school.schoolLogo
+                ? `<img src="data:image/png;base64,${school.schoolLogo}"
+                    style="width:20px;height:20px;border-radius:50%;object-fit:cover;
+                    margin:0 auto 2px;display:block;" />`
+                : ""}
+              <p style="font-weight:bold;font-size:7px;margin:0;">${school.schoolName}</p>
+              <p style="font-size:5px;opacity:0.8;letter-spacing:1px;margin:0;">STUDENT IDENTITY CARD</p>
             </div>
-            <p style="font-weight:bold;font-size:10px;margin:2px 0;">${s.fullName}</p>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;">
-            <div style="background:rgba(255,255,255,0.15);border-radius:3px;padding:3px;text-align:center;">
-              <span style="display:block;font-size:6px;opacity:0.75;">Class</span>
-              <span style="font-size:8px;font-weight:600;">${s.className}-${s.divisionName}</span>
+            <div style="text-align:center;margin-bottom:4px;">
+              <div style="width:28px;height:34px;background:#fff;border-radius:2px;overflow:hidden;
+                margin:0 auto 2px;border:1px solid rgba(255,255,255,0.4);">
+                <img src="${s.photoPath || ''}" style="width:100%;height:100%;object-fit:cover;" />
+              </div>
+              <p style="font-weight:bold;font-size:7.5px;margin:0;">${s.fullName}</p>
             </div>
-            <div style="background:rgba(255,255,255,0.15);border-radius:3px;padding:3px;text-align:center;">
-              <span style="display:block;font-size:6px;opacity:0.75;">Roll No</span>
-              <span style="font-size:8px;font-weight:600;">${s.rollNo}</span>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;">
+              <div style="background:rgba(255,255,255,0.15);border-radius:2px;padding:2px;text-align:center;">
+                <span style="display:block;font-size:5px;opacity:0.75;">Class</span>
+                <span style="font-size:6.5px;font-weight:600;">${s.className}-${s.divisionName}</span>
+              </div>
+              <div style="background:rgba(255,255,255,0.15);border-radius:2px;padding:2px;text-align:center;">
+                <span style="display:block;font-size:5px;opacity:0.75;">Roll No</span>
+                <span style="font-size:6.5px;font-weight:600;">${s.rollNo}</span>
+              </div>
+              <div style="background:rgba(255,255,255,0.15);border-radius:2px;padding:2px;text-align:center;">
+                <span style="display:block;font-size:5px;opacity:0.75;">Blood</span>
+                <span style="font-size:6.5px;font-weight:600;color:#fde047;">${s.bloodGroup}</span>
+              </div>
+              <div style="background:rgba(255,255,255,0.15);border-radius:2px;padding:2px;text-align:center;">
+                <span style="display:block;font-size:5px;opacity:0.75;">DOB</span>
+                <span style="font-size:6.5px;font-weight:600;">${dob}</span>
+              </div>
             </div>
-            <div style="background:rgba(255,255,255,0.15);border-radius:3px;padding:3px;text-align:center;">
-              <span style="display:block;font-size:6px;opacity:0.75;">Blood</span>
-              <span style="font-size:8px;font-weight:600;color:#fde047;">${s.bloodGroup}</span>
-            </div>
-            <div style="background:rgba(255,255,255,0.15);border-radius:3px;padding:3px;text-align:center;">
-              <span style="display:block;font-size:6px;opacity:0.75;">DOB</span>
-              <span style="font-size:8px;font-weight:600;">${dob}</span>
-            </div>
-          </div>
-        </div>`;
+          </div>`) : "";
 
-    const backHtml = hasBack
-      ? `<div style="position:relative;overflow:hidden;min-height:120px;">
-          <img src="data:image/png;base64,${school.cardTemplateBack}"
-            style="width:100%;height:100%;object-fit:cover;display:block;" />
-          <div style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:6px;">
-            <p style="font-size:7px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.9);margin:0 0 2px;">
-              Emergency: ${s.parentName} &nbsp; ${s.emergencyContact}
-            </p>
-            <div style="display:flex;justify-content:space-between;align-items:flex-end;">
+      const backHtml = showBack ? (hasBack
+        ? `<div style="position:relative;width:${cardW};height:${cardH};overflow:hidden;">
+            <img src="data:image/png;base64,${school.cardTemplateBack}"
+              style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;" />
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;
+              justify-content:flex-end;padding:5px;">
+              <p style="font-size:6px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.95);margin:0 0 2px;">
+                Emergency: ${s.parentName || ""} ${s.emergencyContact || ""}</p>
+              <div style="display:flex;justify-content:space-between;align-items:flex-end;">
+                <div style="text-align:center;">
+                  <div style="width:28px;border-bottom:1px solid rgba(255,255,255,0.8);margin-bottom:1px;"></div>
+                  <span style="font-size:5px;color:#fff;">Parent</span>
+                </div>
+                <div style="text-align:center;">
+                  ${school.principalSignature
+                    ? `<img src="data:image/png;base64,${school.principalSignature}"
+                        style="height:12px;object-fit:contain;display:block;margin:0 auto 1px;" />`
+                    : ""}
+                  <div style="width:28px;border-bottom:1px solid rgba(255,255,255,0.8);margin-bottom:1px;"></div>
+                  <span style="font-size:5px;color:#fff;">Principal</span>
+                </div>
+              </div>
+            </div>
+          </div>`
+        : `<div style="width:${cardW};height:${cardH};background:#f8fafc;
+            padding:6px;box-sizing:border-box;display:flex;flex-direction:column;">
+            <p style="font-weight:bold;font-size:7px;color:#1d4ed8;margin:0 0 1px;">${school.schoolName}</p>
+            <p style="font-size:6px;color:#64748b;margin:0 0 4px;">${school.schoolAddress || ""}</p>
+            <div style="border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;
+              padding:3px 0;margin-bottom:4px;">
+              <p style="font-size:6px;font-weight:600;color:#1d4ed8;margin:0 0 1px;">Emergency Contact</p>
+              <p style="font-size:6px;margin:0 0 1px;">${s.parentName || ""}</p>
+              <p style="font-size:6px;color:#64748b;margin:0;">${s.emergencyContact || ""}</p>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:auto;">
               <div style="text-align:center;">
-                <div style="width:38px;border-bottom:1px solid rgba(255,255,255,0.8);margin-bottom:2px;"></div>
-                <span style="font-size:6px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.8);">Parent</span>
+                <div style="width:22px;border-bottom:1px solid #1d4ed8;margin-bottom:1px;"></div>
+                <span style="font-size:5px;color:#94a3b8;">Parent</span>
               </div>
               <div style="text-align:center;">
                 ${school.principalSignature
-                  ? `<img src="data:image/png;base64,${school.principalSignature}" style="height:16px;object-fit:contain;display:block;margin:0 auto 2px;" />`
+                  ? `<img src="data:image/png;base64,${school.principalSignature}"
+                      style="height:12px;object-fit:contain;display:block;margin:0 auto 1px;" />`
                   : ""}
-                <div style="width:38px;border-bottom:1px solid rgba(255,255,255,0.8);margin-bottom:2px;"></div>
-                <span style="font-size:6px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.8);">Principal</span>
+                <div style="width:22px;border-bottom:1px solid #1d4ed8;margin-bottom:1px;"></div>
+                <span style="font-size:5px;color:#94a3b8;">Principal</span>
               </div>
             </div>
-          </div>
-        </div>`
-      : `<div style="background:#f8fafc;padding:10px;font-size:8px;">
-          <p style="font-weight:bold;font-size:8px;color:#1d4ed8;margin:0 0 2px;">${school.schoolName}</p>
-          <p style="font-size:7px;color:#64748b;margin:0 0 6px;">${school.schoolAddress}</p>
-          <div style="border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;padding:4px 0;margin-bottom:6px;">
-            <p style="font-size:7px;font-weight:600;color:#1d4ed8;margin:0 0 1px;">Emergency</p>
-            <p style="font-size:7px;margin:0 0 1px;">${s.parentName}</p>
-            <p style="font-size:7px;color:#64748b;margin:0;">${s.emergencyContact}</p>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:flex-end;">
-            <div style="text-align:center;">
-              <div style="width:38px;border-bottom:1px solid #1d4ed8;margin-bottom:2px;"></div>
-              <span style="font-size:6px;color:#94a3b8;">Parent</span>
-            </div>
-            <div style="text-align:center;">
-              ${school.principalSignature
-                ? `<img src="data:image/png;base64,${school.principalSignature}" style="height:16px;object-fit:contain;display:block;margin:0 auto 2px;" />`
-                : ""}
-              <div style="width:38px;border-bottom:1px solid #1d4ed8;margin-bottom:2px;"></div>
-              <span style="font-size:6px;color:#94a3b8;">Principal</span>
-            </div>
-          </div>
-        </div>`;
+          </div>`) : "";
 
-    return `
-      <div style="width:160px;border-radius:6px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.15);background:#fff;break-inside:avoid;">
-        ${frontHtml}
-        ${backHtml}
-      </div>`;
+      return `${frontHtml}${backHtml}`;
+    }).join("");
+
+    win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>ID Cards</title>
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+    html,body{margin:0;padding:0;background:#fff;
+      -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    @page{size:${cardW} ${cardH};margin:0;}
+    body{filter:${brightnessVal} ${contrastVal};}
+    @media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}}
+  </style>
+</head>
+<body>
+  ${cardsHtml}
+  <script>
+    window.onload=function(){
+      var imgs=document.querySelectorAll('img');var loaded=0;
+      if(!imgs.length){window.print();return;}
+      imgs.forEach(function(img){
+        if(img.complete){loaded++;if(loaded===imgs.length)window.print();}
+        else{img.onload=img.onerror=function(){loaded++;if(loaded===imgs.length)window.print();};}
+      });
+    };
+  <\/script>
+</body>
+</html>`);
+    win.document.close();
   };
 
-  const cardsHtml = selected.map(buildCardHtml).join("");
-
-  const fullHtml = `<!DOCTYPE html>
-<html>
-  <head>
-    <title>ID Cards</title>
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { padding: 16px; background: #fff; }
-      .cards-container {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
+  /* ── Send to backend printer ── */
+  const sendToPrinter = async () => {
+    const selected = filtered.filter(s => selectedIds.includes(s.studentId!));
+    if (!selected.length) return;
+    setIsSending(true);
+    try {
+      const userId   = Number(localStorage.getItem("userId"))   || 0;
+      const schoolId = Number(localStorage.getItem("schoolId")) || 0;
+      const res = await fetch(`${BASE_URL}/Print/createjob`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          schoolId:        schoolId || null,
+          createdByUserId: userId   || null,
+          studentIds:      selected.map(s => s.studentId),
+          copies:          printConfig.copies,
+          orientation:     printConfig.orientation,
+          printQuality:    printConfig.quality,
+          printSide:       printConfig.printSide,
+          brightness:      printConfig.brightness,
+          contrast:        printConfig.contrast,
+          offsetX:         printConfig.offsetX,
+          offsetY:         printConfig.offsetY,
+          cardImagesBase64: [],
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCurrentJob({ ...data, status: "Pending", printedCards: 0 });
+        setShowPanel(false);
+        setShowProgress(true);
+        startPolling(data.jobId);
+      } else {
+        alert(data.message || "Failed to create print job");
       }
-      @media print {
-        body { padding: 8px; }
-        .cards-container { gap: 8px; }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="cards-container">
-      ${cardsHtml}
-    </div>
-    <script>
-      window.onload = function() {
-        // Wait for all images to load before printing
-        const images = document.querySelectorAll('img');
-        let loaded = 0;
-        if (images.length === 0) { window.print(); return; }
-        images.forEach(img => {
-          if (img.complete) {
-            loaded++;
-            if (loaded === images.length) window.print();
-          } else {
-            img.onload = img.onerror = () => {
-              loaded++;
-              if (loaded === images.length) window.print();
-            };
-          }
-        });
-      };
-    <\/script>
-  </body>
-</html>`;
+    } catch {
+      alert("Failed to connect to print server");
+    } finally {
+      setIsSending(false);
+    }
+  };
 
-  win.document.write(fullHtml);
-  win.document.close();
-};
+  const totalCards = selectedIds.length * printConfig.copies;
+
+  const StatusBadge = ({ status }: { status: string }) => {
+    const map: Record<string, { color: string; dot: string }> = {
+      Pending:    { color: "bg-yellow-50 text-yellow-700 border-yellow-200", dot: "bg-yellow-400" },
+      Processing: { color: "bg-blue-50 text-blue-700 border-blue-200",      dot: "bg-blue-500 animate-pulse" },
+      Completed:  { color: "bg-green-50 text-green-700 border-green-200",   dot: "bg-green-500" },
+      Failed:     { color: "bg-red-50 text-red-700 border-red-200",         dot: "bg-red-500" },
+    };
+    const s = map[status] || map.Pending;
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${s.color}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+        {status}
+      </span>
+    );
+  };
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Print ID Cards" description="Select students and print ID cards" />
+      <PageHeader title="Print ID Cards" description="Professional card printing with Evolis-style configuration" />
 
-      {/* FILTERS */}
+      {/* ── FILTERS ── */}
       <Card>
         <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
-          <div>
-            <Label>School</Label>
-            <Select value={selectedSchool} onValueChange={setSelSchool}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {schools.map((s) => <SelectItem key={s.schoolId} value={s.schoolId.toString()}>{s.schoolName}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Academic Year</Label>
-            <Select value={selectedYear} onValueChange={setSelYear}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {years.map((y) => <SelectItem key={y.academicYearId} value={y.academicYearId.toString()}>{y.academicYear}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Class</Label>
-            <Select value={selectedClass} onValueChange={setSelClass}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {classes.map((c) => <SelectItem key={c.classId} value={c.classId.toString()}>{c.className}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Division</Label>
-            <Select value={selectedDiv} onValueChange={setSelDiv}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {divisions.map((d) => <SelectItem key={d.divisionId} value={d.divisionId.toString()}>{d.divisionName}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+          {[
+            { label: "School",        val: selSchool, set: setSelSchool, items: schools,   key: "schoolId",       name: "schoolName"   },
+            { label: "Academic Year", val: selYear,   set: setSelYear,   items: years,     key: "academicYearId", name: "academicYear" },
+            { label: "Class",         val: selClass,  set: setSelClass,  items: classes,   key: "classId",        name: "className"    },
+            { label: "Division",      val: selDiv,    set: setSelDiv,    items: divisions, key: "divisionId",     name: "divisionName" },
+          ].map(f => (
+            <div key={f.label}>
+              <Label className="mb-1.5 block">{f.label}</Label>
+              <Select value={f.val} onValueChange={f.set}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  {f.items.map((i: any) => (
+                    <SelectItem key={i[f.key]} value={i[f.key].toString()}>{i[f.name]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ))}
         </CardContent>
+
+        {/* ── Designer Template Selector ── */}
+        {designerTemplates.length > 0 && (
+          <CardContent className="border-t pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <Label className="text-sm font-semibold">🎨 Use Designer Template</Label>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Select a saved template to use instead of default card design
+                </p>
+              </div>
+              {selectedTemplate && (
+                <button onClick={() => setSelectedTemplate(null)}
+                  className="text-xs text-red-500 hover:underline">
+                  ✕ Use Default Design
+                </button>
+              )}
+            </div>
+            <div className="flex gap-3 flex-wrap">
+              {designerTemplates.map((t: any) => (
+                <div key={t.templateId}
+                  onClick={() => setSelectedTemplate(
+                    selectedTemplate?.templateId === t.templateId ? null : t
+                  )}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer
+                    transition-all hover:shadow-sm
+                    ${selectedTemplate?.templateId === t.templateId
+                      ? "border-blue-500 bg-blue-50 shadow-sm"
+                      : "border-slate-200 hover:border-blue-300"}`}>
+                  <div className="w-6 h-9 rounded border border-slate-200 shrink-0 overflow-hidden"
+                    style={{ background: t.backgroundColor || "#1d4ed8" }}>
+                    {t.backgroundImage && (
+                      <img src={`data:image/png;base64,${t.backgroundImage}`}
+                        className="w-full h-full object-cover" alt="" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-700">{t.name}</p>
+                    <p className="text-[10px] text-slate-400">
+                      {Number(t.cardWidth)}×{Number(t.cardHeight)}mm
+                    </p>
+                  </div>
+                  {selectedTemplate?.templateId === t.templateId && (
+                    <span className="text-blue-600 text-xs ml-1">✓</span>
+                  )}
+                </div>
+              ))}
+            </div>
+            {selectedTemplate && (
+              <div className="mt-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-xs text-green-700 font-medium">
+                  ✅ Using: <strong>{selectedTemplate.name}</strong> — cards will use designer layout
+                </p>
+              </div>
+            )}
+          </CardContent>
+        )}
       </Card>
 
-      {/* SELECTION + PREVIEW */}
+      {/* ── MAIN GRID ── */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <Card className="xl:col-span-1">
           <CardHeader>
-            <CardTitle className="flex gap-2 items-center">
-              <User className="w-5 h-5" /> Select Students
+            <CardTitle className="flex justify-between items-center">
+              <span className="flex gap-2 items-center text-base">
+                <User className="w-4 h-4" /> Students
+              </span>
+              <Badge variant="secondary">{selectedIds.length}/{filtered.length}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex justify-between items-center">
-              <label className="flex gap-2 items-center cursor-pointer">
-                <Checkbox
-                  checked={selectedIds.length === filteredStudents.length && filteredStudents.length > 0}
-                  onCheckedChange={toggleAll}
-                />
-                Select All
-              </label>
-              <Badge>{selectedIds.length} selected</Badge>
-            </div>
+            <label className="flex gap-2 items-center cursor-pointer text-sm font-medium
+              hover:bg-slate-50 p-2 rounded-md">
+              <Checkbox
+                checked={selectedIds.length === filtered.length && filtered.length > 0}
+                onCheckedChange={toggleAll}
+              />
+              Select All
+            </label>
 
-            <div className="max-h-72 overflow-y-auto space-y-1">
-              {filteredStudents.map((s) => (
-                <label key={s.studentId} className="flex gap-2 p-2 rounded hover:bg-muted cursor-pointer">
+            <div className="max-h-72 overflow-y-auto space-y-0.5 border rounded-lg">
+              {filtered.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-6">No accepted students found</p>
+              )}
+              {filtered.map(s => (
+                <label key={s.studentId}
+                  className={`flex gap-2.5 p-2.5 cursor-pointer transition-colors border-b last:border-b-0
+                    ${selectedIds.includes(s.studentId!) ? "bg-blue-50" : "hover:bg-slate-50"}`}>
                   <Checkbox
                     checked={selectedIds.includes(s.studentId!)}
                     onCheckedChange={() => toggle(s.studentId!)}
                   />
                   <div>
                     <p className="text-sm font-medium">{s.fullName}</p>
-                    <p className="text-xs text-muted-foreground">{s.className} – {s.divisionName}</p>
+                    <p className="text-xs text-slate-400">{s.className} – {s.divisionName}</p>
                   </div>
                 </label>
               ))}
-              {filteredStudents.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">No students found</p>
-              )}
             </div>
 
-            <Button className="w-full" disabled={!selectedIds.length || isPrinting} onClick={handlePrint}>
-              <Printer className="w-4 h-4 mr-2" />{isPrinting ? "Preparing…" : "Print"}
+            <Button className="w-full" disabled={!selectedIds.length}
+              onClick={() => { setPrintConfig({ ...DEFAULT_CONFIG }); setShowPanel(true); }}>
+              <Settings2 className="w-4 h-4 mr-2" /> Configure & Print
             </Button>
-            <Button className="w-full" variant="outline" disabled={!selectedIds.length || isPrinting} onClick={handlePrint}>
-              <FileDown className="w-4 h-4 mr-2" />{isPrinting ? "Preparing…" : "Save as PDF"}
+
+            <Button className="w-full" variant="outline" disabled={!selectedIds.length}
+              onClick={() => openBrowserPrint("Both")}>
+              <FileDown className="w-4 h-4 mr-2" /> Quick Save as PDF
+            </Button>
+
+            <Button className="w-full" variant="ghost" size="sm"
+              onClick={() => setShowHistory(h => !h)}>
+              <History className="w-3.5 h-3.5 mr-1.5" />
+              {showHistory ? "Hide" : "Show"} Print History
             </Button>
           </CardContent>
         </Card>
 
         <div className="xl:col-span-2">
-          <Card>
+          <Card className="h-full">
             <CardHeader>
-              <CardTitle className="flex gap-2 items-center">
-                <CreditCard className="w-5 h-5" /> Preview
+              <CardTitle className="flex gap-2 items-center text-base">
+                <CreditCard className="w-4 h-4" /> Preview
+                {selectedIds.length > 0 &&
+                  <Badge className="ml-auto">{selectedIds.length} card{selectedIds.length !== 1 ? "s" : ""}</Badge>}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {selectedIds.length === 0
-                ? <p className="text-sm text-muted-foreground text-center py-10">Select students to preview their ID cards.</p>
-                : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {selectedIds.map((id) => {
-                      const student = filteredStudents.find((s) => s.studentId === id);
-                      const school  = schools.find((sc) => sc.schoolId === student?.schoolId);
+                ? <div className="flex flex-col items-center justify-center py-16 text-slate-300">
+                    <CreditCard className="w-16 h-16 mb-3" />
+                    <p className="text-sm">Select students to preview ID cards</p>
+                  </div>
+                : <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
+                    {selectedIds.map(id => {
+                      const student = filtered.find(s => s.studentId === id);
+                      const school  = schools.find(sc => sc.schoolId === student?.schoolId);
                       if (!student || !school) return null;
-                      return <PreviewIDCard key={id} student={student} school={school} />;
+                      return (
+                        <div key={id} className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2">
+                          <div className="flex items-center gap-2 px-1">
+                            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center
+                              text-xs font-bold text-blue-700 shrink-0">
+                              {student.fullName?.[0]}
+                            </div>
+                            <p className="text-sm font-semibold text-slate-700">{student.fullName}</p>
+                            <span className="text-xs text-slate-400 ml-auto">
+                              {student.className}-{student.divisionName}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-medium text-slate-400 text-center uppercase tracking-wider">
+                                ◼ Front
+                              </p>
+                              <CompactIDCard student={student} school={school} side="front" />
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-medium text-slate-400 text-center uppercase tracking-wider">
+                                ◻ Back
+                              </p>
+                              <CompactIDCard student={student} school={school} side="back" />
+                            </div>
+                          </div>
+                        </div>
+                      );
                     })}
                   </div>
-                )
               }
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* ── PRINT HISTORY ── */}
+      {showHistory && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <History className="w-4 h-4" /> Print Job History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {jobHistory.length === 0
+              ? <p className="text-sm text-slate-400 text-center py-4">No print jobs yet</p>
+              : <div className="space-y-2">
+                  {jobHistory.map((job: any) => (
+                    <div key={job.jobId}
+                      className="flex items-center justify-between p-3 rounded-lg border
+                        bg-slate-50 hover:bg-white transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center">
+                          <Printer className="w-4 h-4 text-blue-700" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{job.jobCode}</p>
+                          <p className="text-xs text-slate-400">
+                            {job.totalCards} cards · {job.printSide} · {job.printQuality} quality ·{" "}
+                            {new Date(job.createdOn).toLocaleString("en-IN")}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <StatusBadge status={job.status} />
+                        <span className="text-xs text-slate-400">{job.progressPercent}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+            }
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ══════════════════════════════════════════
+          PRINT CONFIGURATION PANEL
+      ══════════════════════════════════════════ */}
+      {showPanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-end">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setShowPanel(false)} />
+          <div className="relative w-full max-w-md h-full bg-white shadow-2xl flex flex-col overflow-hidden">
+
+            <div className="bg-gradient-to-r from-blue-700 to-blue-600 text-white px-6 py-5 flex-shrink-0">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Printer className="w-5 h-5" />
+                    <h2 className="text-lg font-bold">Print Configuration</h2>
+                  </div>
+                  <p className="text-blue-200 text-xs">Evolis Premium Suite</p>
+                </div>
+                <button onClick={() => setShowPanel(false)}
+                  className="p-1.5 rounded-lg hover:bg-white/20 transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="mt-4 flex items-center justify-between bg-white/10 rounded-xl p-3">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2.5 h-2.5 rounded-full ${
+                    printerStatus?.isOnline ? "bg-green-400 animate-pulse" : "bg-red-400"}`} />
+                  <div>
+                    <p className="text-sm font-semibold">
+                      {printerStatus?.printerName || "Detecting printer..."}
+                    </p>
+                    <p className="text-xs text-blue-200">{printerStatus?.status || "Checking..."}</p>
+                  </div>
+                </div>
+                {printerStatus?.cardsLeft !== undefined && (
+                  <div className="text-right">
+                    <p className="text-lg font-bold">{printerStatus.cardsLeft}</p>
+                    <p className="text-xs text-blue-200">cards left</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <section>
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Job Settings</h3>
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm mb-2 block">Number of Copies</Label>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setPrintConfig(p => ({ ...p, copies: Math.max(1, p.copies - 1) }))}
+                        className="w-9 h-9 rounded-lg border-2 border-slate-200 flex items-center justify-center
+                          text-lg font-bold hover:border-blue-400 hover:text-blue-600 transition-colors">
+                        −
+                      </button>
+                      <span className="w-12 text-center text-xl font-bold text-blue-700">
+                        {printConfig.copies}
+                      </span>
+                      <button
+                        onClick={() => setPrintConfig(p => ({ ...p, copies: Math.min(10, p.copies + 1) }))}
+                        className="w-9 h-9 rounded-lg border-2 border-slate-200 flex items-center justify-center
+                          text-lg font-bold hover:border-blue-400 hover:text-blue-600 transition-colors">
+                        +
+                      </button>
+                      <span className="text-xs text-slate-400 ml-2">
+                        = {totalCards} total card{totalCards !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm mb-2 block">Print Side</Label>
+                    <ToggleGroup
+                      value={printConfig.printSide}
+                      onChange={v => setPrintConfig(p => ({ ...p, printSide: v }))}
+                      options={[
+                        { label: "Front Only", value: "Front" },
+                        { label: "Both Sides", value: "Both"  },
+                        { label: "Back Only",  value: "Back"  },
+                      ]}
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-sm mb-2 block">Card Orientation</Label>
+                    <ToggleGroup
+                      value={printConfig.orientation}
+                      onChange={v => setPrintConfig(p => ({ ...p, orientation: v }))}
+                      options={[
+                        { label: "Portrait",  value: "Portrait"  },
+                        { label: "Landscape", value: "Landscape" },
+                      ]}
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-sm mb-2 block">Print Quality</Label>
+                    <ToggleGroup
+                      value={printConfig.quality}
+                      onChange={v => setPrintConfig(p => ({ ...p, quality: v }))}
+                      options={[
+                        { label: "Draft",  value: "Draft"  },
+                        { label: "Normal", value: "Normal" },
+                        { label: "High",   value: "High"   },
+                      ]}
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1.5">
+                      {printConfig.quality === "High"
+                        ? "Best quality — recommended for card printing"
+                        : printConfig.quality === "Normal"
+                          ? "Balanced quality and speed"
+                          : "Fast print — lower quality"}
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              <div className="border-t border-slate-100" />
+
+              <section>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Color Adjustment</h3>
+                  <button onClick={() => setPrintConfig(p => ({ ...p, brightness: 0, contrast: 0 }))}
+                    className="text-xs text-blue-600 hover:underline">Reset</button>
+                </div>
+                <div className="space-y-5">
+                  <Slider label="Brightness" value={printConfig.brightness} min={-100} max={100}
+                    icon={<Sun className="w-3.5 h-3.5 text-yellow-500" />}
+                    onChange={v => setPrintConfig(p => ({ ...p, brightness: v }))} />
+                  <Slider label="Contrast" value={printConfig.contrast} min={-100} max={100}
+                    icon={<Contrast className="w-3.5 h-3.5 text-slate-500" />}
+                    onChange={v => setPrintConfig(p => ({ ...p, contrast: v }))} />
+                </div>
+              </section>
+
+              <div className="border-t border-slate-100" />
+
+              <section>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Card Positioning</h3>
+                  <button onClick={() => setPrintConfig(p => ({ ...p, offsetX: 0, offsetY: 0 }))}
+                    className="text-xs text-blue-600 hover:underline">Reset</button>
+                </div>
+                <div className="space-y-5">
+                  <Slider label="Horizontal Offset (X)" value={printConfig.offsetX} min={-20} max={20} unit="mm"
+                    icon={<Move className="w-3.5 h-3.5 text-slate-400" />}
+                    onChange={v => setPrintConfig(p => ({ ...p, offsetX: v }))} />
+                  <Slider label="Vertical Offset (Y)" value={printConfig.offsetY} min={-20} max={20} unit="mm"
+                    icon={<Move className="w-3.5 h-3.5 text-slate-400 rotate-90" />}
+                    onChange={v => setPrintConfig(p => ({ ...p, offsetY: v }))} />
+                </div>
+              </section>
+
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Job Summary</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {[
+                    ["Cards Selected", selectedIds.length],
+                    ["Copies",         printConfig.copies],
+                    ["Total Cards",    totalCards],
+                    ["Print Side",     printConfig.printSide],
+                    ["Orientation",    printConfig.orientation],
+                    ["Quality",        printConfig.quality],
+                  ].map(([k, v]) => (
+                    <div key={String(k)}>
+                      <span className="text-xs text-slate-400">{k}</span>
+                      <p className="font-semibold text-slate-800">{v}</p>
+                    </div>
+                  ))}
+                </div>
+                {selectedTemplate && (
+                  <div className="mt-3 pt-3 border-t border-slate-200">
+                    <span className="text-xs text-slate-400">Designer Template</span>
+                    <p className="font-semibold text-blue-700 text-sm">{selectedTemplate.name}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex-shrink-0 p-4 border-t border-slate-100 bg-slate-50 space-y-2">
+              <Button variant="outline" className="w-full"
+                onClick={() => { setShowPanel(false); openBrowserPrint(printConfig.printSide); }}>
+                <FileDown className="w-4 h-4 mr-2" />
+                Preview & Print / Save PDF
+              </Button>
+              <Button className="w-full h-11 text-base bg-blue-700 hover:bg-blue-800"
+                disabled={isSending || !printerStatus?.isOnline}
+                onClick={sendToPrinter}>
+                {isSending
+                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...</>
+                  : <><Printer className="w-4 h-4 mr-2" /> Send to Printer</>}
+              </Button>
+              {!printerStatus?.isOnline && (
+                <p className="text-xs text-red-500 text-center">
+                  ⚠ Printer is offline — use Preview & Print instead
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          PRINT PROGRESS MODAL
+      ══════════════════════════════════════════ */}
+      {showProgress && currentJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className={`p-6 text-white ${
+              currentJob.status === "Completed" ? "bg-green-600"
+              : currentJob.status === "Failed"  ? "bg-red-600"
+              : "bg-blue-700"}`}>
+              <div className="flex items-center gap-3 mb-2">
+                {currentJob.status === "Completed"
+                  ? <CheckCircle2 className="w-7 h-7" />
+                  : currentJob.status === "Failed"
+                    ? <XCircle className="w-7 h-7" />
+                    : <Loader2 className="w-7 h-7 animate-spin" />}
+                <div>
+                  <h3 className="text-lg font-bold">
+                    {currentJob.status === "Completed" ? "Print Complete!"
+                      : currentJob.status === "Failed"  ? "Print Failed"
+                      : "Printing..."}
+                  </h3>
+                  <p className="text-sm opacity-80">{currentJob.jobCode}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="font-medium text-slate-600">Progress</span>
+                  <span className="font-bold text-blue-700">{currentJob.progressPercent || 0}%</span>
+                </div>
+                <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      currentJob.status === "Completed" ? "bg-green-500"
+                      : currentJob.status === "Failed"  ? "bg-red-500"
+                      : "bg-blue-600"}`}
+                    style={{ width: `${currentJob.progressPercent || 0}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: "Printed",   value: currentJob.printedCards || 0,                                        color: "text-green-600" },
+                  { label: "Total",     value: currentJob.totalCards   || 0,                                        color: "text-blue-600"  },
+                  { label: "Remaining", value: (currentJob.totalCards || 0) - (currentJob.printedCards || 0),       color: "text-slate-600" },
+                ].map(s => (
+                  <div key={s.label}
+                    className="text-center bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-500">Status</span>
+                <StatusBadge status={currentJob.status} />
+              </div>
+
+              {currentJob.errorMessage && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-sm text-red-700">{currentJob.errorMessage}</p>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                {currentJob.status === "Processing" || currentJob.status === "Pending"
+                  ? <Button variant="outline" className="flex-1" onClick={async () => {
+                      await fetch(`${BASE_URL}/Print/canceljob/${currentJob.jobId}`, { method: "DELETE" });
+                      clearInterval(pollRef.current!);
+                      setShowProgress(false);
+                      loadHistory();
+                    }}>Cancel Job</Button>
+                  : <Button className="flex-1" onClick={() => {
+                      setShowProgress(false); setCurrentJob(null); loadHistory();
+                    }}>
+                      {currentJob.status === "Completed" ? "✓ Done" : "Close"}
+                    </Button>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

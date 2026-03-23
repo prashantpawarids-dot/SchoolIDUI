@@ -6,6 +6,7 @@
 //   images: {
 //     unoptimized: true,
 //   },
+//   output: 'export', // static export
 // };
 
 // export default nextConfig;
@@ -18,7 +19,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  output: 'export', // static export
+  output: 'export',
+  trailingSlash: true,
 };
 
 export default nextConfig;
