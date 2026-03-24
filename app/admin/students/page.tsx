@@ -132,40 +132,62 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
   }, [selectedClass]);
 
   // Fetch students with application status
-  useEffect(() => {
-    fetch(`${API_BASE_URL}/Student/getall`)
-      .then((res) => res.json())
-      .then(async (data: any) => {
-        const transformed: Student[] = await Promise.all(
-          data.map(async (s: any) => {
-            const appRes = await fetch(
-              `${API_BASE_URL}/Student/applications/student/${s.studentId}`
-            );
-            const appData = await appRes.json();
-            const status =
-              appData.length > 0
-                ? appData[0].status === "accept"
-                  ? "Approved"
-                  : appData[0].status === "reject"
-                  ? "Rejected"
-                  : "Pending"
-                : "Pending";
-            return {
-              studentId: s.studentId,
-              fullName: s.fullName,
-              rollNo: s.rollNo,
-              className: s.className,
-              divisionName: s.divisionName,
-              schoolName: s.schoolName,
-              academicYear: s.academicYear,
-              status,
-              photoPath: s.photoPath,
-            };
-          })
-        );
-        setStudents(transformed);
-      });
-  }, []);
+  // useEffect(() => {
+  //   fetch(`${API_BASE_URL}/Student/getall`)
+  //     .then((res) => res.json())
+  //     .then(async (data: any) => {
+  //       const transformed: Student[] = await Promise.all(
+  //         data.map(async (s: any) => {
+  //           const appRes = await fetch(
+  //             `${API_BASE_URL}/Student/applications/student/${s.studentId}`
+  //           );
+  //           const appData = await appRes.json();
+  //           const status =
+  //             appData.length > 0
+  //               ? appData[0].status === "accept"
+  //                 ? "Approved"
+  //                 : appData[0].status === "reject"
+  //                 ? "Rejected"
+  //                 : "Pending"
+  //               : "Pending";
+  //           return {
+  //             studentId: s.studentId,
+  //             fullName: s.fullName,
+  //             rollNo: s.rollNo,
+  //             className: s.className,
+  //             divisionName: s.divisionName,
+  //             schoolName: s.schoolName,
+  //             academicYear: s.academicYear,
+  //             status,
+  //             photoPath: s.photoPath,
+  //           };
+  //         })
+  //       );
+  //       setStudents(transformed);
+  //     });
+  // }, []);
+
+  // ✅ Replace with this:
+useEffect(() => {
+  fetch(`${API_BASE_URL}/Student/getalwithstatus`)
+    .then((res) => res.json())
+    .then((data: any[]) => {
+      const transformed: Student[] = (data || []).map((s: any) => ({
+        studentId:    s.studentId,
+        fullName:     s.fullName,
+        rollNo:       s.rollNo,
+        className:    s.className,
+        divisionName: s.divisionName,
+        schoolName:   s.schoolName,
+        academicYear: s.academicYear,
+        photoPath:    s.photoPath,
+        status:
+          s.applicationStatus === "accept" ? "Approved" :
+          s.applicationStatus === "reject" ? "Rejected" : "Pending",
+      }));
+      setStudents(transformed);
+    });
+}, []);
 
   // Filter students
   const filteredStudents = students.filter((s) => {

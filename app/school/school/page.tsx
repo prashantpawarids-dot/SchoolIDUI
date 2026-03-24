@@ -1,20 +1,13 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue,} from "@/components/ui/select";
 import { Edit2, Trash2, Upload, Eye } from "lucide-react";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL + "/School";
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL+"/School";
 
 export default function AdminSchoolsPage() {
   const [schools, setSchools] = useState<any[]>([]);
@@ -62,18 +55,41 @@ export default function AdminSchoolsPage() {
   };
 
   // ✅ ADDED: generic file to base64 handler (replaces handleLogoFile)
-  const handleFileToBase64 = (e: any, field: string) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setSchoolForm((prev: any) => ({
-        ...prev,
-        [field]: reader.result?.toString() || "",
-      }));
-    };
-    reader.readAsDataURL(file);
-  };
+  // const handleFileToBase64 = (e: any, field: string) => {
+  //   const file = e.target.files[0];
+  //   if (!file) return;
+  //   const reader = new FileReader();
+  //   reader.onload = () => {
+  //     setSchoolForm((prev: any) => ({
+  //       ...prev,
+  //       [field]: reader.result?.toString() || "",
+  //     }));
+  //   };
+  //   reader.readAsDataURL(file);
+  // };
+
+  const handleFileToBase64 = async (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+  const file = e.target.files?.[0]
+  if (!file) return
+
+  const formData = new FormData()
+  formData.append("file", file)
+
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/File/upload/schools`,
+      { method: "POST", body: formData }
+    )
+    const data = await res.json()
+    if (data.success) {
+      setSchoolForm((prev: any) => ({ ...prev, [field]: data.url }))
+    } else {
+      alert("Upload failed: " + data.message)
+    }
+  } catch {
+    alert("Upload failed")
+  }
+}
 
   const saveSchool = async () => {
     if (!schoolForm.schoolName || !schoolForm.contactNumber) {
@@ -448,3 +464,4 @@ export default function AdminSchoolsPage() {
     </div>
   );
 }
+

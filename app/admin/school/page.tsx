@@ -1,5 +1,5 @@
 "use client";
-
+import { imgUrl } from "@/lib/image-utils"
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,18 +55,42 @@ export default function AdminSchoolsPage() {
   };
 
   // ✅ CHANGED: replaced handleLogoFile with generic handleFileToBase64
-  const handleFileToBase64 = (e: any, field: string) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setSchoolForm((prev: any) => ({
-        ...prev,
-        [field]: reader.result?.toString() || "",
-      }));
-    };
-    reader.readAsDataURL(file);
-  };
+  // const handleFileToBase64 = (e: any, field: string) => {
+  //   const file = e.target.files[0];
+  //   if (!file) return;
+  //   const reader = new FileReader();
+  //   reader.onload = () => {
+  //     setSchoolForm((prev: any) => ({
+  //       ...prev,
+  //       [field]: reader.result?.toString() || "",
+  //     }));
+  //   };
+  //   reader.readAsDataURL(file);
+  // };
+
+
+  const handleFileToBase64 = async (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+  const file = e.target.files?.[0]
+  if (!file) return
+
+  const formData = new FormData()
+  formData.append("file", file)
+
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/File/upload/schools`,
+      { method: "POST", body: formData }
+    )
+    const data = await res.json()
+    if (data.success) {
+      setSchoolForm((prev: any) => ({ ...prev, [field]: data.url }))
+    } else {
+      alert("Upload failed: " + data.message)
+    }
+  } catch {
+    alert("Upload failed")
+  }
+}
 
   const saveSchool = async () => {
     if (!schoolForm.schoolName || !schoolForm.contactNumber) {

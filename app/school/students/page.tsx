@@ -151,47 +151,71 @@ useEffect(() => {
 // ============================
 // FETCH STUDENTS (FILTERED)
 // ============================
+// useEffect(() => {
+//   if (!schoolId) return;
+
+//   fetch(`${BASE_URL}/Student/getall`)
+//     .then((res) => res.json())
+//     .then(async (data: any[]) => {
+//       // ✅ ONLY THIS SCHOOL'S STUDENTS
+//       const schoolStudents = data.filter(
+//         (s) => s.schoolId === schoolId
+//       );
+
+//       const transformed: Student[] = await Promise.all(
+//         schoolStudents.map(async (s: any) => {
+//           const appRes = await fetch(
+//             `${BASE_URL}/Student/applications/student/${s.studentId}`
+//           );
+//           const appData = await appRes.json();
+
+//           const status =
+//             appData.length > 0
+//               ? appData[0].status === "accept"
+//                 ? "Approved"
+//                 : appData[0].status === "reject"
+//                 ? "Rejected"
+//                 : "Pending"
+//               : "Pending";
+
+//           return {
+//             studentId: s.studentId,
+//             fullName: s.fullName,
+//             rollNo: s.rollNo,
+//             className: s.className,
+//             divisionName: s.divisionName,
+//             schoolName: s.schoolName,
+//             academicYear: s.academicYear,
+//             status,
+//             photoPath: s.photoPath,
+//           };
+//         })
+//       );
+
+//       setStudents(transformed);
+//     });
+// }, [schoolId]);
+
+// ✅ Replace with this:
 useEffect(() => {
   if (!schoolId) return;
 
-  fetch(`${BASE_URL}/Student/getall`)
+  fetch(`${BASE_URL}/Student/getalwithstatus?schoolId=${schoolId}`)
     .then((res) => res.json())
-    .then(async (data: any[]) => {
-      // ✅ ONLY THIS SCHOOL'S STUDENTS
-      const schoolStudents = data.filter(
-        (s) => s.schoolId === schoolId
-      );
-
-      const transformed: Student[] = await Promise.all(
-        schoolStudents.map(async (s: any) => {
-          const appRes = await fetch(
-            `${BASE_URL}/Student/applications/student/${s.studentId}`
-          );
-          const appData = await appRes.json();
-
-          const status =
-            appData.length > 0
-              ? appData[0].status === "accept"
-                ? "Approved"
-                : appData[0].status === "reject"
-                ? "Rejected"
-                : "Pending"
-              : "Pending";
-
-          return {
-            studentId: s.studentId,
-            fullName: s.fullName,
-            rollNo: s.rollNo,
-            className: s.className,
-            divisionName: s.divisionName,
-            schoolName: s.schoolName,
-            academicYear: s.academicYear,
-            status,
-            photoPath: s.photoPath,
-          };
-        })
-      );
-
+    .then((data: any[]) => {
+      const transformed: Student[] = (data || []).map((s: any) => ({
+        studentId:    s.studentId,
+        fullName:     s.fullName,
+        rollNo:       s.rollNo,
+        className:    s.className,
+        divisionName: s.divisionName,
+        schoolName:   s.schoolName,
+        academicYear: s.academicYear,
+        photoPath:    s.photoPath,
+        status:
+          s.applicationStatus === "accept" ? "Approved" :
+          s.applicationStatus === "reject" ? "Rejected" : "Pending",
+      }));
       setStudents(transformed);
     });
 }, [schoolId]);

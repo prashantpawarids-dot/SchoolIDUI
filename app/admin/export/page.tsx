@@ -106,44 +106,62 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
       .catch((err) => console.error("Error fetching schools:", err));
 
     // Fetch all students
-    fetch(`${API_BASE_URL}/Student/getall`)
-      .then((res) => res.json())
-      .then(async (studentsData: Student[]) => {
-        setStudents(studentsData);
+  //   fetch(`${API_BASE_URL}/Student/getall`)
+  //     .then((res) => res.json())
+  //     .then(async (studentsData: Student[]) => {
+  //       setStudents(studentsData);
 
-        // Fetch statuses for all students
-        const statusMap: Record<number, string> = {};
+  //       // Fetch statuses for all students
+  //       const statusMap: Record<number, string> = {};
 
-        await Promise.all(
-          studentsData.map(async (s: Student) => {
-            if (!s.studentId) {
-              console.warn("Skipping student with missing studentId:", s);
-              return;
-            }
+  //       await Promise.all(
+  //         studentsData.map(async (s: Student) => {
+  //           if (!s.studentId) {
+  //             console.warn("Skipping student with missing studentId:", s);
+  //             return;
+  //           }
 
-            try {
-              const res = await fetch(
-                `${API_BASE_URL}/Student/applications/student/${s.studentId}`
-              );
-              if (!res.ok) {
-                console.warn("Failed to fetch status for studentId", s.studentId);
-                statusMap[s.studentId] = "";
-                return;
-              }
+  //           try {
+  //             const res = await fetch(
+  //               `${API_BASE_URL}/Student/applications/student/${s.studentId}`
+  //             );
+  //             if (!res.ok) {
+  //               console.warn("Failed to fetch status for studentId", s.studentId);
+  //               statusMap[s.studentId] = "";
+  //               return;
+  //             }
 
-              const data = await res.json();
-              statusMap[s.studentId] = data[0]?.status ?? "";
-            } catch (err) {
-              console.error("Error fetching status for studentId", s.studentId, err);
-              statusMap[s.studentId] = "";
-            }
-          })
-        );
+  //             const data = await res.json();
+  //             statusMap[s.studentId] = data[0]?.status ?? "";
+  //           } catch (err) {
+  //             console.error("Error fetching status for studentId", s.studentId, err);
+  //             statusMap[s.studentId] = "";
+  //           }
+  //         })
+  //       );
 
-        setStudentStatuses(statusMap);
-      })
-      .catch((err) => console.error("Error fetching students:", err));
-  }, []);
+  //       setStudentStatuses(statusMap);
+  //     })
+  //     .catch((err) => console.error("Error fetching students:", err));
+  // }, []);
+
+  // ✅ Replace with:
+fetch(`${API_BASE_URL}/Student/getalwithstatus`)
+  .then((res) => res.json())
+  .then((studentsData: any[]) => {
+    const data = studentsData || [];
+    setStudents(data as Student[]);
+
+    const statusMap: Record<number, string> = {};
+    data.forEach((s: any) => {
+      if (s.studentId) {
+        statusMap[s.studentId] = s.applicationStatus ?? "";
+      }
+    });
+    setStudentStatuses(statusMap);
+  })
+  .catch((err) => console.error("Error fetching students:", err));
+   }, []);
 
   /* =======================
      DEPENDENT DROPDOWNS

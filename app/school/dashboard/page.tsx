@@ -43,49 +43,78 @@ useEffect(() => {
   // ============================
   // STUDENTS + PENDING STUDENTS
   // ============================
-  fetch(`${BASE_URL}/Student/getall`)
-    .then((res) => res.json())
-    .then(async (students: any[]) => {
-      // ✅ FILTER BY SCHOOL
-      const schoolStudents = students.filter(
-        (s) => s.schoolId === schoolId
-      );
+  // fetch(`${BASE_URL}/Student/getall`)
+  //   .then((res) => res.json())
+  //   .then(async (students: any[]) => {
+  //     // ✅ FILTER BY SCHOOL
+  //     const schoolStudents = students.filter(
+  //       (s) => s.schoolId === schoolId
+  //     );
 
-      setTotalStudents(schoolStudents.length);
+  //     setTotalStudents(schoolStudents.length);
 
-      const pendingStudents: any[] = [];
+  //     const pendingStudents: any[] = [];
 
-      for (const s of schoolStudents) {
-        const appRes = await fetch(
-          `${BASE_URL}/Student/applications/student/${s.studentId}`
-        );
-        const appData = await appRes.json();
+  //     for (const s of schoolStudents) {
+  //       const appRes = await fetch(
+  //         `${BASE_URL}/Student/applications/student/${s.studentId}`
+  //       );
+  //       const appData = await appRes.json();
 
-        if (
-          appData.length > 0 &&
-          appData[0].status !== "accept" &&
-          appData[0].status !== "reject"
-        ) {
-          pendingStudents.push({
-            studentId: s.studentId,
-            fullName: s.fullName,
-            className: s.className,
-            divisionName: s.divisionName,
-            status: "Pending",
-            createdOn: new Date(appData[0].createdOn),
-            firstName: s.firstName,
-            lastName: s.lastName,
-          });
-        }
-      }
+  //       if (
+  //         appData.length > 0 &&
+  //         appData[0].status !== "accept" &&
+  //         appData[0].status !== "reject"
+  //       ) {
+  //         pendingStudents.push({
+  //           studentId: s.studentId,
+  //           fullName: s.fullName,
+  //           className: s.className,
+  //           divisionName: s.divisionName,
+  //           status: "Pending",
+  //           createdOn: new Date(appData[0].createdOn),
+  //           firstName: s.firstName,
+  //           lastName: s.lastName,
+  //         });
+  //       }
+  //     }
 
-      pendingStudents.sort(
-        (a, b) => b.createdOn.getTime() - a.createdOn.getTime()
-      );
+  //     pendingStudents.sort(
+  //       (a, b) => b.createdOn.getTime() - a.createdOn.getTime()
+  //     );
 
-      setRecentStudents(pendingStudents.slice(0, 5));
-    })
-    .catch(console.error);
+  //     setRecentStudents(pendingStudents.slice(0, 5));
+  //   })
+  //   .catch(console.error);
+
+
+  // ✅ Replace with this:
+fetch(`${BASE_URL}/Student/getalwithstatus?schoolId=${schoolId}`)
+  .then((res) => res.json())
+  .then((students: any[]) => {
+    setTotalStudents((students || []).length);
+
+    const pendingStudents = (students || [])
+      .filter((s: any) =>
+        s.applicationStatus !== "accept" && s.applicationStatus !== "reject"
+      )
+      .sort((a: any, b: any) =>
+        new Date(b.createdOn ?? 0).getTime() - new Date(a.createdOn ?? 0).getTime()
+      )
+      .slice(0, 5)
+      .map((s: any) => ({
+        studentId:    s.studentId,
+        fullName:     s.fullName,
+        className:    s.className,
+        divisionName: s.divisionName,
+        status:       "Pending",
+        firstName:    s.firstName,
+        lastName:     s.lastName,
+      }));
+
+    setRecentStudents(pendingStudents);
+  })
+  .catch(console.error);
 
   // ============================
   // PARENTS

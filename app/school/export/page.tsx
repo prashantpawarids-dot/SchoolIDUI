@@ -114,52 +114,71 @@ useEffect(() => {
     .catch((err) => console.error("Error fetching schools:", err));
 
   // Fetch all students for the logged-in school only
-  fetch(`${API_BASE_URL}/Student/getall`)
-    .then((res) => res.json())
-    .then(async (studentsData: Student[]) => {
-      // Filter students by logged-in school
-      const schoolStudents = studentsData.filter((s) => s.schoolId === schoolId);
-      setStudents(schoolStudents);
+//   fetch(`${API_BASE_URL}/Student/getall`)
+//     .then((res) => res.json())
+//     .then(async (studentsData: Student[]) => {
+//       // Filter students by logged-in school
+//       const schoolStudents = studentsData.filter((s) => s.schoolId === schoolId);
+//       setStudents(schoolStudents);
 
-      // Fetch statuses for all filtered students
-      const statusMap: Record<number, string> = {};
+//       // Fetch statuses for all filtered students
+//       const statusMap: Record<number, string> = {};
 
-      await Promise.all(
-        schoolStudents.map(async (s: Student) => {
-          if (!s.studentId) {
-            console.warn("Skipping student with missing studentId:", s);
-            return;
-          }
+//       await Promise.all(
+//         schoolStudents.map(async (s: Student) => {
+//           if (!s.studentId) {
+//             console.warn("Skipping student with missing studentId:", s);
+//             return;
+//           }
 
-          try {
-            const res = await fetch(
-              `${API_BASE_URL}/Student/applications/student/${s.studentId}`
-            );
-            if (!res.ok) {
-              console.warn(
-                "Failed to fetch status for studentId",
-                s.studentId
-              );
-              statusMap[s.studentId] = "";
-              return;
-            }
+//           try {
+//             const res = await fetch(
+//               `${API_BASE_URL}/Student/applications/student/${s.studentId}`
+//             );
+//             if (!res.ok) {
+//               console.warn(
+//                 "Failed to fetch status for studentId",
+//                 s.studentId
+//               );
+//               statusMap[s.studentId] = "";
+//               return;
+//             }
 
-            const data = await res.json();
-            statusMap[s.studentId] = data[0]?.status ?? "";
-          } catch (err) {
-            console.error(
-              "Error fetching status for studentId",
-              s.studentId,
-              err
-            );
-            statusMap[s.studentId] = "";
-          }
-        })
-      );
+//             const data = await res.json();
+//             statusMap[s.studentId] = data[0]?.status ?? "";
+//           } catch (err) {
+//             console.error(
+//               "Error fetching status for studentId",
+//               s.studentId,
+//               err
+//             );
+//             statusMap[s.studentId] = "";
+//           }
+//         })
+//       );
 
-      setStudentStatuses(statusMap);
-    })
-    .catch((err) => console.error("Error fetching students:", err));
+//       setStudentStatuses(statusMap);
+//     })
+//     .catch((err) => console.error("Error fetching students:", err));
+// }, []);
+
+// ✅ Replace with — same for both files (schoolId filter already applied):
+fetch(`${API_BASE_URL}/Student/getalwithstatus?schoolId=${schoolId}`)
+  .then((res) => res.json())
+  .then((studentsData: any[]) => {
+    const data = studentsData || [];
+    setStudents(data as Student[]);
+
+    // Build status map from getalwithstatus response — no extra API calls
+    const statusMap: Record<number, string> = {};
+    data.forEach((s: any) => {
+      if (s.studentId) {
+        statusMap[s.studentId] = s.applicationStatus ?? "";
+      }
+    });
+    setStudentStatuses(statusMap);
+  })
+  .catch((err) => console.error("Error fetching students:", err));
 }, []);
 
   /* =======================

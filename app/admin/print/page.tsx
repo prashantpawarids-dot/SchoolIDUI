@@ -260,20 +260,31 @@ export default function PrintIDCards() {
     setSchools(data || []);
   };
 
+  // const loadStudents = async () => {
+  //   const all: Student[] = await fetch(`${BASE_URL}/Student/getall`).then(r => r.json());
+  //   const accepted: Student[] = [];
+  //   for (const s of all) {
+  //     if (!s.studentId) continue;
+  //     const apps = await fetch(`${BASE_URL}/Student/applications/student/${s.studentId}`).then(r => r.json());
+  //     if (apps?.length && apps[0]?.status === "accept") accepted.push(s);
+  //   }
+  //   setStudents(accepted);
+  //   setFiltered(accepted);
+  //   setClasses(Array.from(new Map(accepted.map(s =>
+  //     [s.classId, { classId: s.classId, className: s.className }]
+  //   )).values()));
+  // };
+
   const loadStudents = async () => {
-    const all: Student[] = await fetch(`${BASE_URL}/Student/getall`).then(r => r.json());
-    const accepted: Student[] = [];
-    for (const s of all) {
-      if (!s.studentId) continue;
-      const apps = await fetch(`${BASE_URL}/Student/applications/student/${s.studentId}`).then(r => r.json());
-      if (apps?.length && apps[0]?.status === "accept") accepted.push(s);
-    }
-    setStudents(accepted);
-    setFiltered(accepted);
-    setClasses(Array.from(new Map(accepted.map(s =>
-      [s.classId, { classId: s.classId, className: s.className }]
-    )).values()));
-  };
+  const data = await fetch(`${BASE_URL}/Student/getalwithstatus`)
+    .then(r => r.json());
+  const accepted = (data || []).filter((s: any) => s.applicationStatus === "accept");
+  setStudents(accepted);
+  setFiltered(accepted);
+  setClasses(Array.from(new Map(accepted.map((s: any) =>
+    [s.classId, { classId: s.classId, className: s.className }]
+  )).values()));
+};
 
   const loadHistory = async () => {
     try {
