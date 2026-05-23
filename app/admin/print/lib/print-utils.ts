@@ -1,24 +1,65 @@
 import type { CardElement, CardTemplate } from "./card-types"
 
 /* ── Resolve dynamic field value from student data ── */
+// export function resolveText(text: string, student: any, school: any): string {
+//   if (!text) return ""
+//   return text
+//     .replace(/\{fullName\}/g,         student?.fullName         || "")
+//     .replace(/\{firstName\}/g,        student?.firstName        || "")
+//     .replace(/\{lastName\}/g,         student?.lastName         || "")
+//     .replace(/\{rollNo\}/g,           String(student?.rollNo    || ""))
+//     .replace(/\{className\}/g,        student?.className        || "")
+//     .replace(/\{divisionName\}/g,     student?.divisionName     || "")
+//     .replace(/\{bloodGroup\}/g,       student?.bloodGroup       || "")
+//     .replace(/\{dob\}/g,              student?.dob
+//       ? new Date(student.dob).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+//       : "")
+//     .replace(/\{schoolName\}/g,       school?.schoolName        || "")
+//     .replace(/\{schoolAddress\}/g,    school?.schoolAddress     || "")
+//     .replace(/\{parentName\}/g,       student?.parentName       || "")
+//     .replace(/\{emergencyContact\}/g, student?.emergencyContact || "")
+//     .replace(/\{studentId\}/g,        String(student?.studentId || ""))
+// }
+
+/* ── Resolve ANY field from student/excel data ── */
 export function resolveText(text: string, student: any, school: any): string {
   if (!text) return ""
-  return text
-    .replace(/\{fullName\}/g,         student?.fullName         || "")
-    .replace(/\{firstName\}/g,        student?.firstName        || "")
-    .replace(/\{lastName\}/g,         student?.lastName         || "")
-    .replace(/\{rollNo\}/g,           String(student?.rollNo    || ""))
-    .replace(/\{className\}/g,        student?.className        || "")
-    .replace(/\{divisionName\}/g,     student?.divisionName     || "")
-    .replace(/\{bloodGroup\}/g,       student?.bloodGroup       || "")
-    .replace(/\{dob\}/g,              student?.dob
-      ? new Date(student.dob).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+
+  let result = text
+
+  // ── Fixed school fields ──
+  result = result
+    .replace(/\{fullName\}/g,         student?.fullName         || student?.FullName         || "")
+    .replace(/\{firstName\}/g,        student?.firstName        || student?.FirstName        || "")
+    .replace(/\{lastName\}/g,         student?.lastName         || student?.LastName         || "")
+    .replace(/\{rollNo\}/g,           String(student?.rollNo    || student?.RollNo           || ""))
+    .replace(/\{className\}/g,        student?.className        || student?.ClassName        || "")
+    .replace(/\{divisionName\}/g,     student?.divisionName     || student?.DivisionName     || "")
+    .replace(/\{bloodGroup\}/g,       student?.bloodGroup       || student?.BloodGroup       || "")
+    .replace(/\{dob\}/g,              student?.dob || student?.DOB
+      ? new Date(student?.dob || student?.DOB).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
       : "")
-    .replace(/\{schoolName\}/g,       school?.schoolName        || "")
-    .replace(/\{schoolAddress\}/g,    school?.schoolAddress     || "")
-    .replace(/\{parentName\}/g,       student?.parentName       || "")
-    .replace(/\{emergencyContact\}/g, student?.emergencyContact || "")
-    .replace(/\{studentId\}/g,        String(student?.studentId || ""))
+    .replace(/\{schoolName\}/g,       school?.schoolName        || school?.SchoolName        || "")
+    .replace(/\{schoolAddress\}/g,    school?.schoolAddress     || school?.SchoolAddress     || "")
+    .replace(/\{parentName\}/g,       student?.parentName       || student?.ParentName       || "")
+    .replace(/\{emergencyContact\}/g, student?.emergencyContact || student?.EmergencyContact || "")
+    .replace(/\{studentId\}/g,        String(student?.studentId || student?.StudentId       || ""))
+    .replace(/\{academicYear\}/g,     student?.academicYear     || student?.AcademicYear     || "")
+
+  // ── Dynamic Excel columns — replace {ColumnName} with matching value ──
+  if (student) {
+    const remaining = result.match(/\{[^}]+\}/g) || []
+    for (const placeholder of remaining) {
+      const key = placeholder.slice(1, -1) // strip { }
+      // Try exact key, then case-insensitive match
+      const val = student[key]
+        ?? Object.entries(student).find(([k]) => k.toLowerCase() === key.toLowerCase())?.[1]
+        ?? ""
+      result = result.replace(placeholder, String(val))
+    }
+  }
+
+  return result
 }
 
 /* ── mm to px conversion (96dpi) ── */

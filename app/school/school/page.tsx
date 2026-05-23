@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue,} from "@/components/ui/select";
 import { Edit2, Trash2, Upload, Eye } from "lucide-react";
-
+import { imgUrl } from "@/lib/image-utils"
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL+"/School";
 
 export default function AdminSchoolsPage() {
@@ -156,15 +156,19 @@ export default function AdminSchoolsPage() {
       schoolAddress: school.schoolAddress || "",
       contactPerson: school.contactPerson || "",
       contactNumber: school.contactNumber || "",
-      schoolLogo: school.schoolLogo?.startsWith("data:") 
-      ? school.schoolLogo 
-      : `data:image/png;base64,${school.schoolLogo}`,
-      cardTemplateFront: school.cardTemplateFront
-        ? `data:image/png;base64,${school.cardTemplateFront}` : "",
-      cardTemplateBack: school.cardTemplateBack
-        ? `data:image/png;base64,${school.cardTemplateBack}` : "",
-      principalSignature: school.principalSignature
-        ? `data:image/png;base64,${school.principalSignature}` : "",
+      // schoolLogo: school.schoolLogo?.startsWith("data:") 
+      // ? school.schoolLogo 
+      // : `data:image/png;base64,${school.schoolLogo}`,
+      // cardTemplateFront: school.cardTemplateFront
+      //   ? `data:image/png;base64,${school.cardTemplateFront}` : "",
+      // cardTemplateBack: school.cardTemplateBack
+      //   ? `data:image/png;base64,${school.cardTemplateBack}` : "",
+      // principalSignature: school.principalSignature
+      //   ? `data:image/png;base64,${school.principalSignature}` : "",
+      schoolLogo:         school.schoolLogo         || "",
+    cardTemplateFront:  school.cardTemplateFront  || "",
+   cardTemplateBack:   school.cardTemplateBack   || "",
+   principalSignature: school.principalSignature || "",
     });
     setShowAddSchool(true);
     setShowAddYear(false);
@@ -398,7 +402,8 @@ export default function AdminSchoolsPage() {
               <div className="w-28 h-28 rounded-full border-2 border-gray-200 overflow-hidden">
                 {viewSchool.schoolLogo ? (
                   <img
-                    src={`data:image/png;base64,${viewSchool.schoolLogo}`}
+                    // src={`data:image/png;base64,${viewSchool.schoolLogo}`}
+                    src={imgUrl(viewSchool.schoolLogo)}
                     alt="School Logo"
                     className="w-full h-full object-cover"
                   />
@@ -425,7 +430,8 @@ export default function AdminSchoolsPage() {
                       <div>
                         <p className="text-xs text-gray-500 mb-1">Front</p>
                         <img
-                          src={`data:image/png;base64,${viewSchool.cardTemplateFront}`}
+                          // src={`data:image/png;base64,${viewSchool.cardTemplateFront}`}
+                          src={imgUrl(viewSchool.cardTemplateFront)}
                           className="w-full rounded border" alt="Front Template"
                         />
                       </div>
@@ -434,7 +440,8 @@ export default function AdminSchoolsPage() {
                       <div>
                         <p className="text-xs text-gray-500 mb-1">Back</p>
                         <img
-                          src={`data:image/png;base64,${viewSchool.cardTemplateBack}`}
+                          // src={`data:image/png;base64,${viewSchool.cardTemplateBack}`}
+                          src={imgUrl(viewSchool.cardTemplateBack)}
                           className="w-full rounded border" alt="Back Template"
                         />
                       </div>
@@ -448,7 +455,8 @@ export default function AdminSchoolsPage() {
                 <div className="pt-2 border-t">
                   <p className="font-semibold text-sm mb-2">Principal Signature</p>
                   <img
-                    src={`data:image/png;base64,${viewSchool.principalSignature}`}
+                    // src={`data:image/png;base64,${viewSchool.principalSignature}`}
+                    src={imgUrl(viewSchool.principalSignature)}
                     className="h-16 object-contain" alt="Principal Signature"
                   />
                 </div>

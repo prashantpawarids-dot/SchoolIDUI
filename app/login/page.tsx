@@ -122,14 +122,14 @@ localStorage.setItem("roleId", data.roleId.toString());
     height={180}
     className="object-contain rounded-xl border-0 border-gray-300"
   />
-  <div className="text-center space-y-4">
+  {/* <div className="text-center space-y-4">
     <h1 className="text-4xl font-bold text-primary">
       IDS ID PRIVATE LIMITED
     </h1>
     <p className="text-xl text-muted-foreground">
       ID Card Management System
     </p>
-  </div>
+  </div> */}
 </div>
 
 

@@ -161,12 +161,14 @@ const formatImage = (img: string) => {
       schoolAddress: school.schoolAddress || "",
       contactPerson: school.contactPerson || "",
       contactNumber: school.contactNumber || "",
-      // schoolLogo: school.schoolLogo || "",
-      schoolLogo: formatImage(school.schoolLogo),
-      // ✅ CHANGED: load existing templates into form
-      cardTemplateFront: formatImage(school.cardTemplateFront),
-cardTemplateBack: formatImage(school.cardTemplateBack),
-principalSignature: formatImage(school.principalSignature),
+    //   schoolLogo: formatImage(school.schoolLogo),
+    //  cardTemplateFront: formatImage(school.cardTemplateFront),
+    //  cardTemplateBack: formatImage(school.cardTemplateBack),
+    //  principalSignature: formatImage(school.principalSignature),
+      schoolLogo:         school.schoolLogo         || "",
+     cardTemplateFront:  school.cardTemplateFront  || "",
+      cardTemplateBack:   school.cardTemplateBack   || "",
+      principalSignature: school.principalSignature || "",
     });
     setShowAddSchool(true);
     setShowAddYear(false);
@@ -343,8 +345,10 @@ principalSignature: formatImage(school.principalSignature),
                   <div key={field} className="flex flex-col gap-2">
                     <Label>{label}</Label>
                     <div className="w-full h-28 rounded border flex items-center justify-center overflow-hidden bg-gray-100">
-                      {schoolForm[field]
-                        ? <img src={schoolForm[field]} alt={label} className="w-full h-full object-contain" />
+                      {/* {schoolForm[field]
+                        ? <img src={schoolForm[field]} alt={label} className="w-full h-full object-contain" /> */}
+                        {schoolForm[field]
+                          ? <img src={imgUrl(schoolForm[field])} alt={label} className="w-full h-full object-contain" />
                         : <Upload className="w-6 h-6 text-gray-400" />}
                     </div>
                     <Input
@@ -420,11 +424,12 @@ principalSignature: formatImage(school.principalSignature),
         <div className="w-28 h-28 rounded-full border-2 border-gray-200 overflow-hidden">
           {viewSchool.schoolLogo ? (
             <img
-              src={
-                viewSchool.schoolLogo?.startsWith("data:image")
-                  ? viewSchool.schoolLogo
-                  : `data:image/png;base64,${viewSchool.schoolLogo}`
-              }
+              // src={
+              //   viewSchool.schoolLogo?.startsWith("data:image")
+              //     ? viewSchool.schoolLogo
+              //     : `data:image/png;base64,${viewSchool.schoolLogo}`
+              // }
+              src={imgUrl(viewSchool.schoolLogo)}
               alt="School Logo"
               className="w-full h-full object-cover"
             />
@@ -454,11 +459,12 @@ principalSignature: formatImage(school.principalSignature),
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Front</p>
                   <img
-                    src={
-                      viewSchool.cardTemplateFront?.startsWith("data:image")
-                        ? viewSchool.cardTemplateFront
-                        : `data:image/png;base64,${viewSchool.cardTemplateFront}`
-                    }
+                    // src={
+                    //   viewSchool.cardTemplateFront?.startsWith("data:image")
+                    //     ? viewSchool.cardTemplateFront
+                    //     : `data:image/png;base64,${viewSchool.cardTemplateFront}`
+                    // }
+                    src={imgUrl(viewSchool.cardTemplateFront)}
                     className="w-full rounded border"
                     alt="Front Template"
                   />
@@ -469,11 +475,12 @@ principalSignature: formatImage(school.principalSignature),
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Back</p>
                   <img
-                    src={
-                      viewSchool.cardTemplateBack?.startsWith("data:image")
-                        ? viewSchool.cardTemplateBack
-                        : `data:image/png;base64,${viewSchool.cardTemplateBack}`
-                    }
+                    // src={
+                    //   viewSchool.cardTemplateBack?.startsWith("data:image")
+                    //     ? viewSchool.cardTemplateBack
+                    //     : `data:image/png;base64,${viewSchool.cardTemplateBack}`
+                    // }
+                    src={imgUrl(viewSchool.cardTemplateBack)}
                     className="w-full rounded border"
                     alt="Back Template"
                   />
@@ -489,11 +496,12 @@ principalSignature: formatImage(school.principalSignature),
           <div className="pt-2 border-t">
             <p className="font-semibold text-sm mb-2">Principal Signature</p>
             <img
-              src={
-                viewSchool.principalSignature?.startsWith("data:image")
-                  ? viewSchool.principalSignature
-                  : `data:image/png;base64,${viewSchool.principalSignature}`
-              }
+              // src={
+              //   viewSchool.principalSignature?.startsWith("data:image")
+              //     ? viewSchool.principalSignature
+              //     : `data:image/png;base64,${viewSchool.principalSignature}`
+              // }
+              src={imgUrl(viewSchool.principalSignature)}
               className="h-16 object-contain"
               alt="Principal Signature"
             />

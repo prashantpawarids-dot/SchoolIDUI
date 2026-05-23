@@ -1,5 +1,5 @@
 "use client";
-
+import { imgUrl } from "@/lib/image-utils"
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/common/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -466,7 +466,8 @@ useEffect(() => {
             <div className="space-y-4">
               <div className="bg-muted/50 p-4 rounded-lg flex gap-4 items-center">
                 <img
-                  src={`data:image/jpeg;base64,${selectedStudent.photoPath}`}
+                  // src={`data:image/jpeg;base64,${selectedStudent.photoPath}`}
+                  src={imgUrl(selectedStudent.photoPath)}
                   alt={selectedStudent.fullName}
                   className="w-24 h-24 object-cover rounded-lg border border-border"
                 />

@@ -5,12 +5,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DYNAMIC_FIELDS } from "../../lib/card-types"
 import type { CardElement } from "../../lib/card-types"
 
+// interface Props {
+//   element: CardElement | null
+//   onChange: (updates: Partial<CardElement>) => void
+// }
+
 interface Props {
   element: CardElement | null
   onChange: (updates: Partial<CardElement>) => void
+  excelColumns?: string[]  // ← add this
 }
 
-export default function PropertyPanel({ element, onChange }: Props) {
+export default function PropertyPanel({ element, onChange,excelColumns  }: Props) {
   if (!element) return (
     <div className="w-64 bg-slate-50 border-l p-4 flex items-center justify-center">
       <p className="text-sm text-slate-400 text-center">Select an element to edit properties</p>
@@ -78,14 +84,62 @@ export default function PropertyPanel({ element, onChange }: Props) {
               </div>
               <div>
                 <Label className="text-xs mb-1 block">Dynamic Field</Label>
-                <Select value={element.dataField || ""} onValueChange={v => onChange({ text: `{${v}}`, dataField: v })}>
+                {/* <Select value={element.dataField || ""} onValueChange={v => onChange({ text: `{${v}}`, dataField: v })}>
                   <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Bind to field..." /></SelectTrigger>
                   <SelectContent>
                     {DYNAMIC_FIELDS.map(f => (
                       <SelectItem key={f.value} value={f.value} className="text-xs">{f.label}</SelectItem>
                     ))}
                   </SelectContent>
-                </Select>
+                </Select> */}
+
+                <Select
+  value={element.dataField || ""}
+  onValueChange={v => onChange({ text: `{${v}}`, dataField: v })}
+>
+  <SelectTrigger className="h-7 text-xs">
+    <SelectValue placeholder="Bind to field..." />
+  </SelectTrigger>
+
+  <SelectContent>
+    {/* School fields */}
+    <SelectItem value="" disabled className="text-xs text-slate-400">
+      — School fields —
+    </SelectItem>
+
+    {DYNAMIC_FIELDS.map(f => (
+      <SelectItem key={f.value} value={f.value} className="text-xs">
+        {f.label}
+      </SelectItem>
+    ))}
+
+    {/* Folder assets */}
+    <SelectItem value="photoPath" className="text-xs">
+      📷 Photo (from folder)
+    </SelectItem>
+    <SelectItem value="qrImagePath" className="text-xs">
+      📱 QR image (from folder)
+    </SelectItem>
+    <SelectItem value="barcodeImagePath" className="text-xs">
+      📊 Barcode image (from folder)
+    </SelectItem>
+
+    {/* Excel columns */}
+    {(excelColumns || []).length > 0 && (
+      <>
+        <SelectItem value="" disabled className="text-xs text-slate-400">
+          — Excel columns —
+        </SelectItem>
+
+        {(excelColumns || []).map(col => (
+          <SelectItem key={col} value={col} className="text-xs">
+            📊 {col}
+          </SelectItem>
+        ))}
+      </>
+    )}
+  </SelectContent>
+</Select>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>

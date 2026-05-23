@@ -94,24 +94,93 @@ export default function DesignerCanvas({
         )
         break
 
-      case "image":
-        const imgSrc = el.dataField === "photoPath"  ? (previewStudent?.photoPath  ? previewStudent.photoPath : "")
-                     : el.dataField === "schoolLogo" ? (previewSchool?.schoolLogo  ? `data:image/png;base64,${previewSchool.schoolLogo}` : "")
-                     : el.src || ""
-        content = imgSrc
-          ? <img src={imgSrc} style={{ width: "100%", height: "100%", objectFit: el.objectFit || "cover", borderRadius: mmToPx(el.borderRadius || 0) * zoom }} alt="" />
-          : <div style={{ width: "100%", height: "100%", background: "#e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10 * zoom, color: "#94a3b8", borderRadius: mmToPx(el.borderRadius || 0) * zoom }}>
-              {el.dataField === "photoPath" ? "Photo" : el.dataField === "schoolLogo" ? "Logo" : "Image"}
-            </div>
-        break
+      // case "image":
+      //   const imgSrc = el.dataField === "photoPath"  ? (previewStudent?.photoPath  ? previewStudent.photoPath : "")
+      //                : el.dataField === "schoolLogo" ? (previewSchool?.schoolLogo  ? `data:image/png;base64,${previewSchool.schoolLogo}` : "")
+      //                : el.src || ""
+      //   content = imgSrc
+      //     ? <img src={imgSrc} style={{ width: "100%", height: "100%", objectFit: el.objectFit || "cover", borderRadius: mmToPx(el.borderRadius || 0) * zoom }} alt="" />
+      //     : <div style={{ width: "100%", height: "100%", background: "#e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10 * zoom, color: "#94a3b8", borderRadius: mmToPx(el.borderRadius || 0) * zoom }}>
+      //         {el.dataField === "photoPath" ? "Photo" : el.dataField === "schoolLogo" ? "Logo" : "Image"}
+      //       </div>
+      //   break
 
-      case "barcode":
-        content = <BarcodeElement value={barcodeVal || "123456"} type={el.barcodeType || "code128"} showText={el.showText ?? true} width={el.width} height={el.height} />
-        break
+      // case "barcode":
+      //   content = <BarcodeElement value={barcodeVal || "123456"} type={el.barcodeType || "code128"} showText={el.showText ?? true} width={el.width} height={el.height} />
+      //   break
 
-      case "qrcode":
-        content = <QRElement value={qrVal || "QR"} size={Math.min(w, h)} />
-        break
+      // case "qrcode":
+      //   content = <QRElement value={qrVal || "QR"} size={Math.min(w, h)} />
+      //   break
+
+      case "image": {
+  // Priority: 1) folder photo 2) student photoPath from DB 3) school logo
+  const imgSrc =
+    el.dataField === "photoPath"
+      ? (previewStudent?.photoPath || "")           // ← URL or base64
+    : el.dataField === "qrImagePath"
+      ? (previewStudent?.qrImagePath || "")          // ← from QR folder
+    : el.dataField === "barcodeImagePath"
+      ? (previewStudent?.barcodeImagePath || "")     // ← from barcode folder
+    : el.dataField === "schoolLogo"
+      ? (previewSchool?.schoolLogo
+          ? `data:image/png;base64,${previewSchool.schoolLogo}`
+          : "")
+    : el.src || ""
+
+  return imgSrc
+    ? <img src={imgSrc}
+        style={{ width: "100%", height: "100%",
+          objectFit: el.objectFit || "cover",
+          borderRadius: mmToPx(el.borderRadius || 0) * zoom }}
+        alt="" />
+    : <div style={{
+        width: "100%", height: "100%",
+        background: "#e2e8f0",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 10 * zoom, color: "#94a3b8",
+        borderRadius: mmToPx(el.borderRadius || 0) * zoom,
+      }}>
+        {el.dataField === "photoPath" ? "Photo"
+          : el.dataField === "qrImagePath" ? "QR"
+          : el.dataField === "barcodeImagePath" ? "Barcode"
+          : el.dataField === "schoolLogo" ? "Logo"
+          : "Image"}
+      </div>
+}
+
+case "barcode": {
+  // If folder barcode image available — show it directly
+  const barcodeImgSrc = previewStudent?.barcodeImagePath || ""
+  if (barcodeImgSrc && barcodeImgSrc.length > 10) {
+    return <img src={barcodeImgSrc}
+      style={{ width: "100%", height: "100%", objectFit: "contain" }} alt="barcode" />
+  }
+  // Otherwise generate from value
+  const barcodeVal = resolveText(
+    el.barcodeValue || (el.dataField ? `{${el.dataField}}` : "000000"),
+    previewStudent, previewSchool
+  )
+  return <BarcodeElement value={barcodeVal || "123456"}
+    type={el.barcodeType || "code128"}
+    showText={el.showText ?? true}
+    width={el.width} height={el.height} />
+}
+
+case "qrcode": {
+  // If folder QR image available — show it directly
+  const qrImgSrc = previewStudent?.qrImagePath || ""
+  if (qrImgSrc && qrImgSrc.length > 10) {
+    return <img src={qrImgSrc}
+      style={{ width: "100%", height: "100%", objectFit: "contain" }} alt="qr" />
+  }
+  // Otherwise generate from value
+  const qrVal = resolveText(
+    el.qrValue || (el.dataField ? `{${el.dataField}}` : "QR"),
+    previewStudent, previewSchool
+  )
+  return <QRElement value={qrVal || "QR"} size={Math.min(w, h)} />
+}
 
       case "shape":
       case "line":
