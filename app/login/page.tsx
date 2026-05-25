@@ -64,9 +64,9 @@ export default function LoginPage() {
           username: data.username,
         })
       );
-localStorage.setItem("userId", data.userId.toString());
-localStorage.setItem("schoolId", data.schoolId.toString());
-localStorage.setItem("roleId", data.roleId.toString());
+localStorage.setItem("userId", data.userId?.toString() ?? "");
+localStorage.setItem("schoolId", data.schoolId?.toString() ?? "");
+localStorage.setItem("roleId", data.roleId?.toString() ?? "");
       // Redirect based on role
       switch (data.roleId) {
         case 1:

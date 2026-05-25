@@ -32,6 +32,15 @@ const DEFAULT_CONFIG = {
   offsetY: 0,
 };
 
+const SERVER_BASE = BASE_URL ? BASE_URL.replace(/\/api\/?$/, "") : "";
+
+function imgSrc(val: string | undefined | null, mime = "image/jpeg"): string {
+  if (!val) return "";
+  if (val.startsWith("http")) return val;
+  if (val.startsWith("/")) return `${SERVER_BASE}${val}`;
+  return `data:${mime};base64,${val}`;
+}
+
 function CompactIDCard({ student, school, side = "front" }: {
   student: Student; school: any; side?: "front" | "back"
 }) {
@@ -42,11 +51,11 @@ function CompactIDCard({ student, school, side = "front" }: {
     <div className="overflow-hidden shadow-md rounded-lg bg-white w-full">
       {hasFront ? (
         <div className="relative overflow-hidden" style={{ minHeight: 200 }}>
-          <img src={`data:image/png;base64,${school.cardTemplateFront}`}
+          <img src={imgSrc(school.cardTemplateFront)}
             className="w-full h-full object-cover" style={{ display: "block" }} alt="Front" />
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 p-2">
             <div className="w-12 h-14 rounded overflow-hidden border-2 border-white mt-8">
-              <img src={student.photoPath || "/placeholder.svg"} alt={student.fullName}
+              <img src={student.photoPath ? imgSrc(student.photoPath) : "/placeholder.svg"} alt={student.fullName}
                 className="w-full h-full object-cover" />
             </div>
             <p className="font-bold text-[10px] text-center text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
@@ -63,7 +72,7 @@ function CompactIDCard({ student, school, side = "front" }: {
           <div className="text-center border-b border-white/20 pb-2 mb-2">
             <div className="w-8 h-8 bg-white rounded-full mx-auto mb-1 flex items-center justify-center">
               {school.schoolLogo
-                ? <img src={`data:image/png;base64,${school.schoolLogo}`}
+                ? <img src={imgSrc(school.schoolLogo)}
                     className="w-full h-full object-cover rounded-full" alt="Logo" />
                 : <svg className="w-5 h-5 text-blue-700" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" strokeWidth="2">
@@ -76,7 +85,7 @@ function CompactIDCard({ student, school, side = "front" }: {
           </div>
           <div className="text-center mb-2">
             <div className="w-10 h-12 bg-white rounded mx-auto mb-1 overflow-hidden border border-white/30">
-              <img src={student.photoPath || "/placeholder.svg"} alt={student.fullName}
+              <img src={student.photoPath ? imgSrc(student.photoPath) : "/placeholder.svg"} alt={student.fullName}
                 className="w-full h-full object-cover" />
             </div>
             <p className="font-bold text-[11px]">{student.fullName}</p>
@@ -103,7 +112,7 @@ function CompactIDCard({ student, school, side = "front" }: {
     <div className="overflow-hidden shadow-md rounded-lg bg-white w-full">
       {hasBack ? (
         <div className="relative overflow-hidden" style={{ minHeight: 120 }}>
-          <img src={`data:image/png;base64,${school.cardTemplateBack}`}
+          <img src={imgSrc(school.cardTemplateBack)}
             className="w-full h-full object-cover" style={{ display: "block" }} alt="Back" />
           <div className="absolute inset-0 flex flex-col justify-end p-2 gap-1">
             <p className="text-[7px] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] font-semibold">
@@ -117,7 +126,7 @@ function CompactIDCard({ student, school, side = "front" }: {
               </div>
               <div className="text-center">
                 {school.principalSignature &&
-                  <img src={`data:image/png;base64,${school.principalSignature}`}
+                  <img src={imgSrc(school.principalSignature)}
                     className="h-4 object-contain mx-auto mb-0.5" alt="Sig" />}
                 <div className="w-10 border-b border-white/70 mb-0.5" />
                 <span className="text-[6px] text-white">Principal</span>
@@ -152,7 +161,7 @@ function CompactIDCard({ student, school, side = "front" }: {
             </div>
             <div className="text-center">
               {school.principalSignature &&
-                <img src={`data:image/png;base64,${school.principalSignature}`}
+                <img src={imgSrc(school.principalSignature)}
                   className="h-4 object-contain mx-auto mb-0.5" alt="Sig" />}
               <div className="w-10 border-b border-blue-700 mb-0.5" />
               <span className="text-[6px] text-slate-400">Principal</span>
@@ -260,20 +269,7 @@ export default function PrintIDCards() {
     setSchools(data || []);
   };
 
-  // const loadStudents = async () => {
-  //   const all: Student[] = await fetch(`${BASE_URL}/Student/getall`).then(r => r.json());
-  //   const accepted: Student[] = [];
-  //   for (const s of all) {
-  //     if (!s.studentId) continue;
-  //     const apps = await fetch(`${BASE_URL}/Student/applications/student/${s.studentId}`).then(r => r.json());
-  //     if (apps?.length && apps[0]?.status === "accept") accepted.push(s);
-  //   }
-  //   setStudents(accepted);
-  //   setFiltered(accepted);
-  //   setClasses(Array.from(new Map(accepted.map(s =>
-  //     [s.classId, { classId: s.classId, className: s.className }]
-  //   )).values()));
-  // };
+
 
   const loadStudents = async () => {
   const data = await fetch(`${BASE_URL}/Student/getalwithstatus`)
@@ -367,7 +363,7 @@ export default function PrintIDCards() {
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   /* ── Open browser print ── */
-  const openBrowserPrint = (side: string) => {
+ const openBrowserPrint = (side: string) => {
     const selected = filtered.filter(s => selectedIds.includes(s.studentId!));
     if (!selected.length) return;
 
@@ -400,7 +396,6 @@ export default function PrintIDCards() {
         return;
       } catch (e) {
         console.error("Template render error:", e);
-        // fallback to default below
       }
     }
 
@@ -422,16 +417,22 @@ export default function PrintIDCards() {
       const showFront = side === "Front" || side === "Both";
       const showBack  = side === "Back"  || side === "Both";
 
+      const photoSrc     = s.photoPath              ? imgSrc(s.photoPath)                  : "";
+      const frontSrc     = school.cardTemplateFront  ? imgSrc(school.cardTemplateFront)     : "";
+      const backSrc      = school.cardTemplateBack   ? imgSrc(school.cardTemplateBack)      : "";
+      const logoSrc      = school.schoolLogo         ? imgSrc(school.schoolLogo)            : "";
+      const sigSrc       = school.principalSignature ? imgSrc(school.principalSignature)    : "";
+
       const frontHtml = showFront ? (hasFront
         ? `<div style="position:relative;width:${cardW};height:${cardH};overflow:hidden;">
-            <img src="data:image/png;base64,${school.cardTemplateFront}"
+            <img src="${frontSrc}"
               style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;" />
             <div style="position:absolute;inset:0;display:flex;flex-direction:column;
               align-items:center;justify-content:center;gap:3px;padding:6px;">
               <div style="width:${isLandscape ? "36px" : "42px"};height:${isLandscape ? "42px" : "52px"};
                 border-radius:3px;overflow:hidden;border:1.5px solid rgba(255,255,255,0.85);
                 margin-top:${isLandscape ? "0" : "24px"};">
-                <img src="${s.photoPath || ''}" style="width:100%;height:100%;object-fit:cover;" />
+                <img src="${photoSrc}" style="width:100%;height:100%;object-fit:cover;" />
               </div>
               <p style="font-weight:bold;font-size:${isLandscape ? "8px" : "9px"};color:#fff;
                 text-align:center;text-shadow:0 1px 3px rgba(0,0,0,0.95);margin:1px 0 0;">${s.fullName}</p>
@@ -447,8 +448,8 @@ export default function PrintIDCards() {
             padding:6px;box-sizing:border-box;">
             <div style="text-align:center;border-bottom:1px solid rgba(255,255,255,0.3);
               padding-bottom:4px;margin-bottom:4px;">
-              ${school.schoolLogo
-                ? `<img src="data:image/png;base64,${school.schoolLogo}"
+              ${logoSrc
+                ? `<img src="${logoSrc}"
                     style="width:20px;height:20px;border-radius:50%;object-fit:cover;
                     margin:0 auto 2px;display:block;" />`
                 : ""}
@@ -458,7 +459,7 @@ export default function PrintIDCards() {
             <div style="text-align:center;margin-bottom:4px;">
               <div style="width:28px;height:34px;background:#fff;border-radius:2px;overflow:hidden;
                 margin:0 auto 2px;border:1px solid rgba(255,255,255,0.4);">
-                <img src="${s.photoPath || ''}" style="width:100%;height:100%;object-fit:cover;" />
+                <img src="${photoSrc}" style="width:100%;height:100%;object-fit:cover;" />
               </div>
               <p style="font-weight:bold;font-size:7.5px;margin:0;">${s.fullName}</p>
             </div>
@@ -484,7 +485,7 @@ export default function PrintIDCards() {
 
       const backHtml = showBack ? (hasBack
         ? `<div style="position:relative;width:${cardW};height:${cardH};overflow:hidden;">
-            <img src="data:image/png;base64,${school.cardTemplateBack}"
+            <img src="${backSrc}"
               style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;" />
             <div style="position:absolute;inset:0;display:flex;flex-direction:column;
               justify-content:flex-end;padding:5px;">
@@ -496,8 +497,8 @@ export default function PrintIDCards() {
                   <span style="font-size:5px;color:#fff;">Parent</span>
                 </div>
                 <div style="text-align:center;">
-                  ${school.principalSignature
-                    ? `<img src="data:image/png;base64,${school.principalSignature}"
+                  ${sigSrc
+                    ? `<img src="${sigSrc}"
                         style="height:12px;object-fit:contain;display:block;margin:0 auto 1px;" />`
                     : ""}
                   <div style="width:28px;border-bottom:1px solid rgba(255,255,255,0.8);margin-bottom:1px;"></div>
@@ -522,8 +523,8 @@ export default function PrintIDCards() {
                 <span style="font-size:5px;color:#94a3b8;">Parent</span>
               </div>
               <div style="text-align:center;">
-                ${school.principalSignature
-                  ? `<img src="data:image/png;base64,${school.principalSignature}"
+                ${sigSrc
+                  ? `<img src="${sigSrc}"
                       style="height:12px;object-fit:contain;display:block;margin:0 auto 1px;" />`
                   : ""}
                 <div style="width:22px;border-bottom:1px solid #1d4ed8;margin-bottom:1px;"></div>
