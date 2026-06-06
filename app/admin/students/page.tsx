@@ -6,6 +6,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useSchools } from "@/lib/school-context";
+
+import { filterStudentsByRole, getAssignedSchoolIds, isSuperAdmin } from "@/lib/auth";
 import {
   Select,
   SelectContent,
@@ -31,6 +34,7 @@ interface School {
 interface AcademicYear {
   academicYearId: number;
   academicYear: string;
+
 }
 interface Class {
   classId: number;
@@ -51,11 +55,14 @@ interface Student {
   academicYear: string;
   status: "Pending" | "Approved" | "Rejected";
   photoPath: string;
+  schoolId?: number;
+  
 }
 
 export default function ManageStudents() {
   const [students, setStudents] = useState<Student[]>([]);
-  const [schools, setSchools] = useState<School[]>([]);
+  // const [schools, setSchools] = useState<School[]>([]);
+  const { schools } = useSchools();
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
@@ -69,15 +76,11 @@ export default function ManageStudents() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-// const API_BASE_URL = "/api/proxy";
-
-  // Fetch schools
-  useEffect(() => {
-    fetch(`${API_BASE_URL}/School/list`)
-      .then((res) => res.json())
-      .then(setSchools);
-  }, []);
-
+useEffect(() => {
+  if (schools.length === 1) {
+    setSelectedSchool(schools[0].schoolId.toString());
+  }
+}, [schools]);
   // Fetch academic years when school changes
   useEffect(() => {
     if (selectedSchool !== "all") {
@@ -131,45 +134,14 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
     }
   }, [selectedClass]);
 
-  // Fetch students with application status
-  // useEffect(() => {
-  //   fetch(`${API_BASE_URL}/Student/getall`)
-  //     .then((res) => res.json())
-  //     .then(async (data: any) => {
-  //       const transformed: Student[] = await Promise.all(
-  //         data.map(async (s: any) => {
-  //           const appRes = await fetch(
-  //             `${API_BASE_URL}/Student/applications/student/${s.studentId}`
-  //           );
-  //           const appData = await appRes.json();
-  //           const status =
-  //             appData.length > 0
-  //               ? appData[0].status === "accept"
-  //                 ? "Approved"
-  //                 : appData[0].status === "reject"
-  //                 ? "Rejected"
-  //                 : "Pending"
-  //               : "Pending";
-  //           return {
-  //             studentId: s.studentId,
-  //             fullName: s.fullName,
-  //             rollNo: s.rollNo,
-  //             className: s.className,
-  //             divisionName: s.divisionName,
-  //             schoolName: s.schoolName,
-  //             academicYear: s.academicYear,
-  //             status,
-  //             photoPath: s.photoPath,
-  //           };
-  //         })
-  //       );
-  //       setStudents(transformed);
-  //     });
-  // }, []);
+ 
 
   // ✅ Replace with this:
 useEffect(() => {
-  fetch(`${API_BASE_URL}/Student/getalwithstatus`)
+  if (schools.length === 0 && !isSuperAdmin()) return;
+  const ids = getAssignedSchoolIds();
+  const schoolParam = isSuperAdmin() ? "" : ids.length > 0 ? `?schoolId=${ids[0]}` : "";
+  fetch(`${API_BASE_URL}/Student/getalwithstatus${schoolParam}`)
     .then((res) => res.json())
     .then((data: any[]) => {
       const transformed: Student[] = (data || []).map((s: any) => ({
@@ -179,23 +151,23 @@ useEffect(() => {
         className:    s.className,
         divisionName: s.divisionName,
         schoolName:   s.schoolName,
-        academicYear: s.academicYear,
+      
         photoPath:    s.photoPath,
+        schoolId:     s.schoolId,
+        academicYear: s.academicYear ?? s.academicYearName ?? "",
         status:
-          s.applicationStatus === "accept" ? "Approved" :
-          s.applicationStatus === "reject" ? "Rejected" : "Pending",
+        ["Approved","approved","accept","Accept"].includes(s.applicationStatus) ? "Approved" :
+["Rejected","rejected","reject"].includes(s.applicationStatus) ? "Rejected" : "Pending",
       }));
-      setStudents(transformed);
+     setStudents(filterStudentsByRole(transformed));
     });
-}, []);
+}, [schools]);
 
   // Filter students
   const filteredStudents = students.filter((s) => {
     const matchesSchool =
-      selectedSchool === "all" ||
-      s.schoolName ===
-        schools.find((sc) => sc.schoolId.toString() === selectedSchool)
-          ?.schoolName;
+  selectedSchool === "all" ||
+  s.schoolName === schools.find((sc) => sc.schoolId.toString() === selectedSchool)?.schoolName;
     const matchesYear =
       selectedYear === "all" ||
       s.academicYear ===

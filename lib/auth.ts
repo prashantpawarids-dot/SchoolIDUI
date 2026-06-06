@@ -76,3 +76,31 @@ export function isAuthenticated(): boolean {
   const { token } = getAuthData();
   return !!token;
 }
+export function getAssignedSchoolIds(): number[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(localStorage.getItem("assignedSchoolIds") || "[]"); }
+  catch { return []; }
+}
+
+export function getRoleId(): number {
+  if (typeof window === "undefined") return 0;
+  return Number(localStorage.getItem("roleId") || 0);
+}
+
+export function isSuperAdmin(): boolean {
+  return getRoleId() === 5;
+}
+
+export function filterSchoolsByRole(schools: any[]): any[] {
+  if (isSuperAdmin()) return schools;
+  const ids = getAssignedSchoolIds();
+  if (ids.length === 0) return [];
+  return schools.filter(s => ids.includes(s.schoolId));
+}
+
+export function filterStudentsByRole(students: any[]): any[] {
+  if (isSuperAdmin()) return students;
+  const ids = getAssignedSchoolIds();
+  if (ids.length === 0) return [];
+  return students.filter(s => ids.includes(s.schoolId));
+}

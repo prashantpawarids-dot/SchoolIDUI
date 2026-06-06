@@ -29,6 +29,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useRouter } from "next/navigation"
 import {
   Plus,
   Upload,
@@ -110,50 +111,12 @@ export default function ParentDashboard() {
         // const res = await fetch(`${API_BASE_URL}/Student/getalwithstatus?parentUserId=${parentUserId}`);
         const data = await res.json();
 
-        // const studentsWithStatus: ParentStudent[] = await Promise.all(
-        //   data.map(async (student: any) => {
-        //     const appRes = await fetch(
-        //       `${API_BASE_URL}/Student/applications/student/${student.studentId}`
-        //     );
-        //     const applications = await appRes.json();
-        //     const latestApp = applications[0] || {};
-
-        //     // Normalize backend status
-        //     const normalizedStatus =
-        //       latestApp.status === "accept"
-        //         ? "Approved"
-        //         : latestApp.status === "reject"
-        //         ? "Rejected"
-        //         : "Pending";
-
-        //     return {
-        //       id: student.studentId,
-        //       firstName: student.firstName,
-        //       middleName: student.middleName || "",
-        //       lastName: student.lastName,
-        //       fullName: `${student.firstName} ${student.middleName || ""} ${
-        //         student.lastName
-        //       }`.trim(),
-        //       dob: student.dob,
-        //       bloodGroup: student.bloodGroup,
-        //       classId: student.classId,
-        //       className: student.className,
-        //       divisionId: student.divisionId,
-        //       divisionName: student.divisionName,
-        //       rollNo: student.rollNo || "",
-        //       address: student.address,
-        //       photo: student.photoPath || null,
-        //       status: normalizedStatus,
-        //       rejectionReason: latestApp.remarks || undefined,
-        //       submittedDate: latestApp.createdOn || null,
-        //     };
-        //   })
-        // );
+       
 
         const studentsWithStatus: ParentStudent[] = data.map((student: any) => {
   const normalizedStatus =
-    student.applicationStatus === "accept" ? "Approved" :
-    student.applicationStatus === "reject" ? "Rejected" : "Pending";
+  ["Approved", "approved", "accept", "Accept"].includes(student.applicationStatus) ? "Approved" :
+  ["Rejected", "rejected", "reject"].includes(student.applicationStatus) ? "Rejected" : "Pending";
 
   return {
     id:              student.studentId,
@@ -191,6 +154,8 @@ setStudents(studentsWithStatus);
   const approvedCount = students.filter((s) => s.status === "Approved").length;
   const pendingCount = students.filter((s) => s.status === "Pending").length;
   const rejectedCount = students.filter((s) => s.status === "Rejected").length;
+
+  const router = useRouter()
 
   return (
     <div className="space-y-6">
@@ -312,14 +277,18 @@ setStudents(studentsWithStatus);
                   </Badge>
 
                   <Dialog>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-primary hover:bg-gray-100">
-                        <Eye className="w-5 h-5" />
-                      </Button>
-                    </DialogTrigger>
+                    <Button variant="outline" size="sm"
+  onClick={() => router.push(`/parent/edit-student?id=${student.id}`)}>
+  Edit
+</Button>
+<DialogTrigger asChild>
+  <Button
+    variant="ghost"
+    size="icon"
+    className="text-primary hover:bg-gray-100">
+    <Eye className="w-5 h-5" />
+  </Button>
+</DialogTrigger>
                     <DialogContent className="max-w-2xl rounded-xl p-6 bg-white shadow-xl border border-gray-200">
                       <DialogHeader className="pb-4 border-b">
                         <DialogTitle className="text-xl text-center font-semibold text-gray-800">

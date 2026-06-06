@@ -10,6 +10,8 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useSchools } from "@/lib/school-context";
+import { filterStudentsByRole } from "@/lib/auth";
 import {
   Select,
   SelectContent,
@@ -76,7 +78,7 @@ export default function ExportData() {
   /* =======================
      STATE
   ======================= */
-  const [schools, setSchools] = useState<School[]>([]);
+ const { schools } = useSchools();
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
@@ -100,10 +102,10 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
   ======================= */
   useEffect(() => {
     // Fetch schools
-    fetch(`${API_BASE_URL}/School/list`)
-      .then((res) => res.json())
-      .then(setSchools)
-      .catch((err) => console.error("Error fetching schools:", err));
+    // fetch(`${API_BASE_URL}/School/list`)
+    //   .then((res) => res.json())
+    //   .then(setSchools)
+    //   .catch((err) => console.error("Error fetching schools:", err));
 
     // Fetch all students
   //   fetch(`${API_BASE_URL}/Student/getall`)
@@ -150,7 +152,7 @@ fetch(`${API_BASE_URL}/Student/getalwithstatus`)
   .then((res) => res.json())
   .then((studentsData: any[]) => {
     const data = studentsData || [];
-    setStudents(data as Student[]);
+   setStudents(filterStudentsByRole(data) as Student[]);
 
     const statusMap: Record<number, string> = {};
     data.forEach((s: any) => {

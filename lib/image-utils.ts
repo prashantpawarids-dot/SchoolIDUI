@@ -1,5 +1,4 @@
-const API_SERVER = (process.env.NEXT_PUBLIC_API_BASE_URL || "")
-  .replace("/api", "")
+const API_SERVER = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/api$/, "")
 
 export function imgUrl(path?: string | null): string {
   if (!path) return "/placeholder.svg"

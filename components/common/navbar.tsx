@@ -47,10 +47,22 @@ export function Navbar({ userRole = "Admin" }: NavbarProps) {
 
     const fetchUserData = async () => {
   try {
-    const resUser = await fetch(`${BASE_URL}/Auth/userdetails/${userId}`);
-    const textUser = await resUser.text();
+  const resUser = await fetch(`${BASE_URL}/Auth/userdetails/${userId}`);
 
-    if (!textUser || textUser.trim() === "" || textUser.trim() === "null" || textUser.trim().startsWith("<")) {
+// ✅ Add: bail out on non-OK status before reading body
+if (!resUser.ok) {
+  const raw = localStorage.getItem("authUser");
+  const authUser = raw ? JSON.parse(raw) : null;
+  if (authUser?.username) {
+    setUserName(authUser.username);
+    setUserInitial(authUser.username.charAt(0).toUpperCase());
+  }
+  return;
+}
+
+const textUser = await resUser.text();
+
+   if (!textUser || textUser.trim() === "" || textUser.trim() === "null" || textUser.trim().startsWith("<")) {
       // SuperAdmin has no personal details — use username from localStorage
       const raw = localStorage.getItem("authUser");
       const authUser = raw ? JSON.parse(raw) : null;
@@ -91,15 +103,19 @@ export function Navbar({ userRole = "Admin" }: NavbarProps) {
     router.push("/login");
   };
 
-  const roleColors: Record<string, string> = {
+ const roleColors: Record<string, string> = {
+    SuperAdmin: "bg-purple-600",
     Admin: "bg-primary",
     Parent: "bg-accent",
-    Partner: "bg-green-600",
+    Partner: "bg-orange-500",
     School: "bg-blue-600",
-  };
-
-  const displayedRole =
-    roleId === 2 ? "Parent" : roleId === 4 ? "School" : userRole;
+};
+ const displayedRole =
+    roleId === 5 ? "SuperAdmin" :
+    roleId === 1 ? "Admin" :
+    roleId === 2 ? "Parent" :
+    roleId === 3 ? "Partner" :
+    roleId === 4 ? "School" : userRole;
 
   // Render only after mounted to prevent hydration mismatch
   if (!mounted) return <div className="h-16" />;

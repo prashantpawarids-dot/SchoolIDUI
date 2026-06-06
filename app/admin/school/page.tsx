@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useSchools } from "@/lib/school-context";
 import {
   Select,
   SelectContent,
@@ -17,11 +18,12 @@ import { Edit2, Trash2, Upload, Eye } from "lucide-react";
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL + "/School";
 
 export default function AdminSchoolsPage() {
-  const [schools, setSchools] = useState<any[]>([]);
+ 
   const [showAddSchool, setShowAddSchool] = useState(false);
   const [showAddYear, setShowAddYear] = useState(false);
   const [editingSchoolId, setEditingSchoolId] = useState<number | null>(null);
   const [viewSchool, setViewSchool] = useState<any>(null);
+  const { schools, reloadSchools } = useSchools();
 
   // ✅ CHANGED: added cardTemplateFront, cardTemplateBack, principalSignature
   const [schoolForm, setSchoolForm] = useState<any>({
@@ -40,19 +42,19 @@ export default function AdminSchoolsPage() {
     academicYear: "",
   });
 
-  useEffect(() => {
-    loadSchools();
-  }, []);
+  // useEffect(() => {
+  //   loadSchools();
+  // }, []);
 
-  const loadSchools = async () => {
-    try {
-      const res = await fetch(`${BASE_URL}/list`);
-      const data = await res.json();
-      setSchools(data);
-    } catch (error) {
-      console.error("Failed to load schools:", error);
-    }
-  };
+  // const loadSchools = async () => {
+  //   try {
+  //     const res = await fetch(`${BASE_URL}/list`);
+  //     const data = await res.json();
+  //     setSchools(data);
+  //   } catch (error) {
+  //     console.error("Failed to load schools:", error);
+  //   }
+  // };
 
   // ✅ CHANGED: replaced handleLogoFile with generic handleFileToBase64
   // const handleFileToBase64 = (e: any, field: string) => {
@@ -143,7 +145,7 @@ export default function AdminSchoolsPage() {
         cardTemplateBack: "",
         principalSignature: "",
       });
-      loadSchools();
+    reloadSchools();
     } catch (error: any) {
       console.error("Error saving school:", error);
       alert("Failed to save school");
@@ -178,7 +180,7 @@ const formatImage = (img: string) => {
     if (!confirm("Are you sure you want to delete this school?")) return;
     try {
       await fetch(`${BASE_URL}/deleteschool/${schoolId}`, { method: "DELETE" });
-      loadSchools();
+      reloadSchools();
     } catch (error) {
       console.error("Failed to delete school:", error);
     }

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
+import { useSchools } from "@/lib/school-context";
 import { PageHeader } from "@/components/common/page-header";
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
@@ -93,7 +94,7 @@ function StepBadge({ n, done }: { n: number; done: boolean }) {
 export default function ImportExcelPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [schools, setSchools]             = useState<School[]>([]);
+  const { schools } = useSchools();
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [classes, setClasses]             = useState<Class[]>([]);
 
@@ -113,12 +114,12 @@ export default function ImportExcelPage() {
   /* ══════════════════════════════════════════
      DATA FETCHING
   ══════════════════════════════════════════ */
-  useEffect(() => {
-    fetch(`${API_BASE_URL}/School/list`)
-      .then((r) => r.json())
-      .then(setSchools)
-      .catch(console.error);
-  }, []);
+  // useEffect(() => {
+  //   fetch(`${API_BASE_URL}/School/list`)
+  //     .then((r) => r.json())
+  //     .then(setSchools)
+  //     .catch(console.error);
+  // }, []);
 
   // When school changes → load academic years
   useEffect(() => {

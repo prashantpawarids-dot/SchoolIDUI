@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { getAssignedSchoolIds, isSuperAdmin } from "@/lib/auth";
 import { Label } from "@/components/ui/label"
 import {
   Select, SelectContent, SelectItem,
@@ -61,26 +62,37 @@ export default function ChangeCredentialsPage() {
   const [isError, setIsError] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  useEffect(() => {
-    if (!mounted || !isAdmin) return
-    fetch(`${API_BASE}/School/list`)
-      .then(r => r.json())
-      .then(setSchools)
-      .catch(console.error)
-  }, [mounted, isAdmin])
+useEffect(() => {
+  if (!mounted || !isAdmin) return
+  fetch(`${API_BASE}/School/list`)
+    .then(r => r.json())
+    .then(data => {
+      const ids = getAssignedSchoolIds();
+      const filtered = isSuperAdmin() ? data : data.filter((s: any) => ids.includes(s.schoolId));
+      setSchools(filtered);
+    })
+    .catch(console.error)
+}, [mounted, isAdmin])
 
-  useEffect(() => {
-    if (!mounted || isParent) return
-    const url = isAdmin
-      ? filterSchool !== "all"
-        ? `${API_BASE}/Auth/users/school/${filterSchool}`
-        : `${API_BASE}/Auth/users`
-      : `${API_BASE}/Auth/users/school/${loggedInSchoolId}`
-    fetch(url)
-      .then(r => r.json())
-      .then(setUsers)
-      .catch(console.error)
-  }, [mounted, filterSchool, isAdmin, isSchool, isParent, loggedInSchoolId])
+ useEffect(() => {
+  if (!mounted || isParent) return
+  const url = isAdmin
+    ? filterSchool !== "all"
+      ? `${API_BASE}/Auth/users/school/${filterSchool}`
+      : `${API_BASE}/Auth/users`
+    : `${API_BASE}/Auth/users/school/${loggedInSchoolId}`
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      if (isSuperAdmin()) { setUsers(data); return; }
+      const ids = getAssignedSchoolIds();
+      const filtered = data.filter((u: any) =>
+        u.schoolId == null || ids.includes(u.schoolId)
+      );
+      setUsers(filtered);
+    })
+    .catch(console.error)
+}, [mounted, filterSchool, isAdmin, isSchool, isParent, loggedInSchoolId])
 
   // Parent — load own user
   useEffect(() => {

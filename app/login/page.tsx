@@ -35,6 +35,13 @@ export default function LoginPage() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+  localStorage.removeItem("authUser");
+  localStorage.removeItem("userId");
+  localStorage.removeItem("schoolId");
+  localStorage.removeItem("roleId");
+}, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -67,23 +74,25 @@ export default function LoginPage() {
 localStorage.setItem("userId", data.userId?.toString() ?? "");
 localStorage.setItem("schoolId", data.schoolId?.toString() ?? "");
 localStorage.setItem("roleId", data.roleId?.toString() ?? "");
+localStorage.setItem("assignedSchoolIds", JSON.stringify(data.assignedSchoolIds || []));
       // Redirect based on role
       switch (data.roleId) {
-        case 1:
-          router.push("/admin/dashboard");
-          break;
-        case 2:
-          router.push("/parent/dashboard");
-          break;
-        case 3:
-          router.push("/partner/dashboard");
-          break;
-        case 4:
-          router.push("/school/dashboard");
-          break;
-        default:
-          router.push("/");
-      }
+  case 5: // SuperAdmin
+  case 1: // Admin
+    router.push("/admin/dashboard");
+    break;
+  case 2: // Parent
+    router.push("/parent/dashboard");
+    break;
+  case 3: // Partner
+    router.push("/partner/dashboard");
+    break;
+  case 4: // School
+    router.push("/school/dashboard");
+    break;
+  default:
+    router.push("/");
+}
     } catch (err: any) {
       setError(err.message || "Login failed");
     } finally {

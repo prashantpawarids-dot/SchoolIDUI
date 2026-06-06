@@ -7,13 +7,14 @@ const ROLE_DASHBOARD: Record<number, string> = {
   2: "/parent/dashboard",
   3: "/partner/dashboard",
   4: "/school/dashboard",
+  5: "/admin/dashboard", // ✅ SuperAdmin
 };
 
-const ROUTE_ROLE: Record<string, number> = {
-  "/admin": 1,
-  "/school": 4,
-  "/parent": 2,
-  "/partner": 3,
+const ROUTE_ROLE: Record<string, number[]> = {
+  "/admin": [1, 5], // ✅ allow Admin + SuperAdmin
+  "/school": [4],
+  "/parent": [2],
+  "/partner": [3],
 };
 
 export function useAuthGuard() {
@@ -21,17 +22,36 @@ export function useAuthGuard() {
 
   useEffect(() => {
     const stored = localStorage.getItem("authUser");
-    if (!stored) { router.replace("/login"); return; }
+
+    if (!stored) {
+      router.replace("/login");
+      return;
+    }
 
     let user: { roleId: number } | null = null;
-    try { user = JSON.parse(stored); } catch { router.replace("/login"); return; }
 
-    if (!user?.roleId) { router.replace("/login"); return; }
+    try {
+      user = JSON.parse(stored);
+    } catch {
+      router.replace("/login");
+      return;
+    }
+
+    if (!user?.roleId) {
+      router.replace("/login");
+      return;
+    }
 
     const pathname = window.location.pathname;
-    for (const [prefix, roleId] of Object.entries(ROUTE_ROLE)) {
-      if (pathname.startsWith(prefix) && user.roleId !== roleId) {
-        router.replace(ROLE_DASHBOARD[user.roleId] ?? "/login");
+
+    for (const [prefix, allowedRoles] of Object.entries(ROUTE_ROLE)) {
+      if (
+        pathname.startsWith(prefix) &&
+        !allowedRoles.includes(user.roleId)
+      ) {
+        router.replace(
+          ROLE_DASHBOARD[user.roleId] ?? "/login"
+        );
         return;
       }
     }
