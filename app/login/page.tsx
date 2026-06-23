@@ -101,7 +101,7 @@ localStorage.setItem("assignedSchoolIds", JSON.stringify(data.assignedSchoolIds 
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-primary/5 via-background to-accent/5 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-primary/5 via-background to-accent/5 p-3 md:p-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full max-w-5xl">
         {/* Branding */}
         {/* <div className="hidden lg:flex flex-col justify-center items-center space-y-8">
@@ -113,7 +113,7 @@ localStorage.setItem("assignedSchoolIds", JSON.stringify(data.assignedSchoolIds 
             className="object-contain rounded-xl border-0 border-gray-300"
           />
           <div className="text-center space-y-4">
-            <h1 className="text-4xl font-bold text-primary">
+            <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-primary">
               IDS ID SMART TECH
             </h1>
             <p className="text-xl text-muted-foreground">
@@ -132,7 +132,7 @@ localStorage.setItem("assignedSchoolIds", JSON.stringify(data.assignedSchoolIds 
     className="object-contain rounded-xl border-0 border-gray-300"
   />
   {/* <div className="text-center space-y-4">
-    <h1 className="text-4xl font-bold text-primary">
+    <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-primary">
       IDS ID PRIVATE LIMITED
     </h1>
     <p className="text-xl text-muted-foreground">

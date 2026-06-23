@@ -308,7 +308,7 @@ fetch(`${API_BASE_URL}/Student/getalwithstatus?schoolId=${schoolId}`)
 
       {/* FILTERS */}
       <Card>
-        <CardContent className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
           {/* School */}
           <div>
             <Label>School</Label>
@@ -408,7 +408,7 @@ fetch(`${API_BASE_URL}/Student/getalwithstatus?schoolId=${schoolId}`)
       </Card>
 
       {/* EXPORT OPTIONS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
         {exportOptions.map((option) => {
           const Icon = option.icon;
           const isExporting = exportingType === option.type;
@@ -465,7 +465,7 @@ fetch(`${API_BASE_URL}/Student/getalwithstatus?schoolId=${schoolId}`)
         </CardHeader>
 
         <CardContent className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[720px]">
             <thead className="bg-muted/30">
               <tr>
                 <th className="p-2 text-left font-bold">Roll No</th>

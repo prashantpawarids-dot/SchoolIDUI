@@ -94,3 +94,4 @@ export const getAcceptedStudentsForPrint = async () => {
 
   return acceptedStudents;
 };
+export const SYSTEM_PARENT_USER_ID = 5063; // placeholder "no real parent" user — see tblUser

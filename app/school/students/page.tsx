@@ -298,10 +298,10 @@ useEffect(() => {
 
       {/* Filters */}
       <Card className="shadow-lg border-0">
-        <CardContent className="p-4 flex flex-wrap gap-4">
+        <CardContent className="p-3 md:p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4">
           {/* School */}
           <Select value={selectedSchool} onValueChange={setSelectedSchool}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Select School" />
             </SelectTrigger>
             <SelectContent>
@@ -319,7 +319,7 @@ useEffect(() => {
             value={selectedYear}
             onValueChange={setSelectedYear}
             disabled={selectedSchool === "all"}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Select Academic Year" />
             </SelectTrigger>
             <SelectContent>
@@ -339,7 +339,7 @@ useEffect(() => {
             value={selectedClass}
             onValueChange={setSelectedClass}
             disabled={selectedSchool === "all"}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Select Class" />
             </SelectTrigger>
             <SelectContent>
@@ -357,7 +357,7 @@ useEffect(() => {
             value={selectedDivision}
             onValueChange={setSelectedDivision}
             disabled={selectedClass === "all"}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Select Division" />
             </SelectTrigger>
             <SelectContent>
@@ -387,7 +387,7 @@ useEffect(() => {
       <Card className="shadow-lg border-0">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[800px]">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
                   <th className="text-left p-4 font-semibold">Student</th>

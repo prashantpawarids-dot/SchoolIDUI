@@ -23,8 +23,127 @@ function imgSrc(val?: string | null): string {
   return `${SERVER_BASE}/${val}`;
 }
 
+// ── Detect orientation from an image URL ──────────────
+function detectOrientation(url: string): Promise<"landscape" | "portrait"> {
+  return new Promise(resolve => {
+    if (!url) return resolve("portrait");
+    const img = new Image();
+    img.onload  = () => resolve(img.naturalWidth > img.naturalHeight ? "landscape" : "portrait");
+    img.onerror = () => resolve("portrait");
+    img.src = url;
+  });
+}
+
+// ── Print card dimensions based on orientation ────────
+function printSize(orientation: "landscape" | "portrait") {
+  return orientation === "landscape"
+    ? { cardW: "85.6mm", cardH: "54mm" }
+    : { cardW: "54mm",   cardH: "85.6mm" };
+}
+
+// ── Parse saved templateFieldsJson safely ─────────────
+// Handles new {front, back} format AND legacy flat array
+function parseTemplateJson(json: string): { front: any[]; back: any[] } {
+  try {
+    const parsed = JSON.parse(json);
+    if (parsed && Array.isArray(parsed.front)) {
+      return { front: parsed.front, back: parsed.back || [] };
+    }
+    if (Array.isArray(parsed)) {
+      return { front: parsed, back: [] }; // legacy
+    }
+  } catch {}
+  return { front: [], back: [] };
+}
+
+// ── Preview card: fetches its own template fresh, renders fields on top of background ──
+// ── Preview card: fetches its own template fresh, renders fields on top of background ──
+function PreviewCard({ student, school, previewSide }: { student: any; school: any; previewSide: "front" | "back" }) {
+  const [fields, setFields] = useState<any[]>([]);
+  const [orientation, setOrientation] = useState<"landscape" | "portrait">("portrait");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${BASE_URL}/CardTemplate/list?schoolId=${school.schoolId}`)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return;
+        if (data?.length > 0 && data[0].templateFieldsJson) {
+          const parsed = parseTemplateJson(data[0].templateFieldsJson);
+          setFields(previewSide === "front" ? parsed.front : parsed.back);
+        } else {
+          setFields([]);
+        }
+      })
+      .catch(() => setFields([]));
+
+    const templateUrl = previewSide === "front" ? school.cardTemplateFront : school.cardTemplateBack;
+    if (templateUrl) {
+      detectOrientation(imgSrc(templateUrl)).then(ori => { if (!cancelled) setOrientation(ori); });
+    } else {
+      setOrientation("portrait");
+    }
+
+    return () => { cancelled = true; };
+  }, [school.schoolId, previewSide]);
+
+  const templateSrc = previewSide === "front" ? school.cardTemplateFront : school.cardTemplateBack;
+  const sAny = student as any;
+  const dobFmt = sAny.dob
+    ? new Date(sAny.dob).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+    : "";
+
+  const paddingTop = orientation === "landscape" ? "63.3%" : "158%"; // 204/323 ratios, inverted for landscape
+
+ return (
+    <div className="relative rounded overflow-hidden w-full" style={{ paddingTop }}>
+      {templateSrc
+        ? <img src={imgSrc(templateSrc)} className="absolute inset-0 w-full h-full object-cover rounded" alt={previewSide} />
+        : <div className="absolute inset-0" style={{
+            background: previewSide === "back"
+              ? "linear-gradient(135deg,#475569,#64748b)"
+              : "linear-gradient(135deg,#1d4ed8,#3b82f6)"
+          }} />
+      }
+      {fields.filter((f: any) => f.visible).map((f: any) => {
+        const justifyMap: Record<string, string> = { left: "flex-start", center: "center", right: "flex-end" };
+        const base: React.CSSProperties = {
+          position: "absolute", left: `${f.x}%`, top: `${f.y}%`,
+          width: `${f.width}%`, height: `${f.height}%`, zIndex: 1,
+        };
+        if (f.isImage) {
+          let src = "";
+          if (f.key === "photo")      src = imgSrc(sAny.photoPath);
+          if (f.key === "schoolLogo") src = imgSrc(school.schoolLogo);
+          if (f.key === "signature")  src = imgSrc(school.principalSignature);
+          if (!src) return null;
+          return <img key={f.key} src={src} style={{ ...base, objectFit: "cover", borderRadius: 2 }} alt="" />;
+        }
+        let val = "";
+        if (f.key === "studentName")   val = sAny.fullName || "";
+        if (f.key === "classDivision") val = `${sAny.className || ""} - ${sAny.divisionName || ""}`;
+        if (f.key === "rollNo")        val = `Roll: ${sAny.rollNo || ""}`;
+        if (f.key === "dob")           val = dobFmt ? `DOB: ${dobFmt}` : "";
+        if (f.key === "bloodGroup")    val = sAny.bloodGroup || "";
+        if (f.key === "address")       val = sAny.address || "";
+        if (f.key === "parentContact") val = sAny.emergencyContact || sAny.parentContact || "";
+        if (f.key === "parentName")    val = sAny.parentName || "";
+        if (!val) return null;
+        return (
+          <div key={f.key} style={{
+            ...base, fontSize: f.fontSize, color: f.fontColor || "#000",
+            fontWeight: f.bold ? "bold" : "normal", fontStyle: f.italic ? "italic" : "normal",
+            whiteSpace: "nowrap", overflow: "hidden", display: "flex",
+            alignItems: "center", justifyContent: justifyMap[f.align || "left"],
+          }}>{val}</div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function PrintIDCards() {
-const { schools } = useSchools();
+  const { schools } = useSchools();
   const [years, setYears]             = useState<any[]>([]);
   const [classes, setClasses]         = useState<any[]>([]);
   const [divisions, setDivisions]     = useState<any[]>([]);
@@ -35,41 +154,44 @@ const { schools } = useSchools();
   const [selClass, setSelClass]       = useState("all");
   const [selDiv, setSelDiv]           = useState("all");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [printing, setPrinting]       = useState(false);
-  const [templateMap, setTemplateMap] = useState<Record<number, any[]>>({});
+ const [printing, setPrinting]       = useState(false);
+  const [previewSide, setPreviewSide] = useState<"front" | "back">("front");
+
+  // templateMap stores { front: FieldPosition[], back: FieldPosition[] } per schoolId
+  const [templateMap, setTemplateMap] = useState<Record<number, { front: any[]; back: any[] }>>({});
 
   // ── Load data ──
-useEffect(() => {
-  // Load schools + templates
-  const loadAll = async () => {
-    const map: Record<number, any[]> = {};
-for (const s of schools || []) {
-      try {
-        const data = await fetch(`${BASE_URL}/CardTemplate/list?schoolId=${s.schoolId}`).then(r => r.json());
-        if (data?.length > 0 && data[0].templateFieldsJson)
-          map[s.schoolId] = JSON.parse(data[0].templateFieldsJson);
-      } catch {}
-    }
-    setTemplateMap(map);
-  };
+  useEffect(() => {
+    const loadAll = async () => {
+      const map: Record<number, { front: any[]; back: any[] }> = {};
+      for (const s of schools || []) {
+        try {
+          const data = await fetch(`${BASE_URL}/CardTemplate/list?schoolId=${s.schoolId}`).then(r => r.json());
+          if (data?.length > 0 && data[0].templateFieldsJson) {
+            map[s.schoolId] = parseTemplateJson(data[0].templateFieldsJson);
+          }
+        } catch {}
+      }
+      setTemplateMap(map);
+    };
 
-  loadAll();
+    loadAll();
 
-  // Reload when user comes back from designer
-  window.addEventListener("focus", loadAll);
+    // Reload when user returns from designer
+    window.addEventListener("focus", loadAll);
 
-  // Load students
-  fetch(`${BASE_URL}/Student/getalwithstatus`).then(r => r.json()).then(d => {
-    const approved = (d || []).filter((s: any) =>
-      ["Approved", "approved", "accept", "Accept"].includes(s.applicationStatus)
-    );
-    const roleFiltered = filterStudentsByRole(approved);
-setStudents(roleFiltered);
-setFiltered(roleFiltered);
-  });
+    // Load students
+    fetch(`${BASE_URL}/Student/getalwithstatus`).then(r => r.json()).then(d => {
+      const approved = (d || []).filter((s: any) =>
+        ["Approved", "approved", "accept", "Accept"].includes(s.applicationStatus)
+      );
+      const roleFiltered = filterStudentsByRole(approved);
+      setStudents(roleFiltered);
+      setFiltered(roleFiltered);
+    });
 
-  return () => window.removeEventListener("focus", loadAll);
-}, []);
+    return () => window.removeEventListener("focus", loadAll);
+  }, [schools]);
 
   // ── Filter cascades ──
   useEffect(() => {
@@ -102,112 +224,235 @@ setFiltered(roleFiltered);
   const toggleAll = () =>
     setSelectedIds(selectedIds.length === filtered.length ? [] : filtered.map(s => s.studentId!));
 
-  // ── Print ──
-  const printCards = async () => {
+  // ── Print — front + back pages per student ──
+const printCards = async () => {
     const selected = filtered.filter(s => selectedIds.includes(s.studentId!));
     if (!selected.length) return;
     setPrinting(true);
-
-    const win = window.open("", "_blank");
+const win = window.open("", "_blank");
     if (!win) { setPrinting(false); return; }
 
-    const cardW = "54mm";
-    const cardH = "85.6mm";
+    // ── CR80 card pixel dimensions at 96dpi ──
+    // 1mm = 3.7795275591px
+    // Portrait:  54mm × 85.6mm = 204px × 323px
+    // Landscape: 85.6mm × 54mm = 323px × 204px
+    const SHORT = 204; // 54mm
+    const LONG  = 323; // 85.6mm
 
-    // Load saved templates per school
+    function cardPx(ori: string) {
+      return ori === "landscape"
+        ? { w: LONG,  h: SHORT }
+        : { w: SHORT, h: LONG  };
+    }
+
+    // ── Reload templates fresh ──
     const schoolIds = [...new Set(selected.map(s => s.schoolId).filter(Boolean))] as number[];
-    const templateMap: Record<number, any[]> = {};
+    const freshTemplateMap: Record<number, { front: any[]; back: any[] }> = {};
     for (const sid of schoolIds) {
       try {
         const data = await fetch(`${BASE_URL}/CardTemplate/list?schoolId=${sid}`).then(r => r.json());
         if (data?.length > 0 && data[0].templateFieldsJson)
-          templateMap[sid] = JSON.parse(data[0].templateFieldsJson);
+          freshTemplateMap[sid] = parseTemplateJson(data[0].templateFieldsJson);
       } catch {}
     }
 
+    // ── Detect orientation per school ──
+    const orientationMap: Record<number, { front: "landscape" | "portrait"; back: "landscape" | "portrait" }> = {};
+    for (const sc of schools) {
+      const frontOri = sc.cardTemplateFront ? await detectOrientation(imgSrc(sc.cardTemplateFront)) : "portrait";
+      const backOri  = sc.cardTemplateBack  ? await detectOrientation(imgSrc(sc.cardTemplateBack))  : frontOri;
+      orientationMap[sc.schoolId] = { front: frontOri, back: backOri };
+    }
+
+    // ── Build card HTML per student ──
     const cardsHtml = selected.map(s => {
       const school = schools.find(sc => sc.schoolId === s.schoolId);
       if (!school) return "";
 
       const photoSrc = imgSrc(s.photoPath);
       const frontSrc = imgSrc(school.cardTemplateFront);
+      const backSrc  = imgSrc(school.cardTemplateBack);
       const logoSrc  = imgSrc(school.schoolLogo);
       const sigSrc   = imgSrc(school.principalSignature);
-      const dob = s.dob
-        ? new Date(s.dob).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+      const dobRaw   = (s as any).dob || (s as any).DOB || "";
+      const dob      = dobRaw
+        ? new Date(dobRaw).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
         : "";
 
-      const bg = frontSrc
-        ? `<img src="${frontSrc}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" />`
-        : `<div style="position:absolute;inset:0;background:linear-gradient(135deg,#1d4ed8,#3b82f6);"></div>`;
+      const ori  = orientationMap[school.schoolId] || { front: "portrait", back: "portrait" };
+      const front = cardPx(ori.front);
+      const back  = cardPx(ori.back);
 
-      const savedFields = s.schoolId ? templateMap[s.schoolId] : null;
+      const bgFront = frontSrc
+        ? `<img src="${frontSrc}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;" />`
+        : `<div style="position:absolute;inset:0;background:linear-gradient(135deg,#1d4ed8,#3b82f6);z-index:0;"></div>`;
 
-      // ── Use saved designer layout ──
-      if (savedFields && Array.isArray(savedFields)) {
-        const fieldsHtml = savedFields.filter((f: any) => f.visible).map((f: any) => {
-          const style = `position:absolute;left:${f.x}%;top:${f.y}%;width:${f.width}%;height:${f.height}%;z-index:1;`;
+      const bgBack = backSrc
+        ? `<img src="${backSrc}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;" />`
+        : `<div style="position:absolute;inset:0;background:linear-gradient(135deg,#374151,#6b7280);z-index:0;"></div>`;
+
+      // ── Render fields to HTML ──
+     // Normalize student fields — API may return PascalCase or camelCase
+      const sAny = s as any;
+      const studentFullName   = sAny.fullName   || sAny.FullName   || "";
+      const studentClassName  = sAny.className  || sAny.ClassName  || "";
+      const studentDivName    = sAny.divisionName || sAny.DivisionName || "";
+      const studentRollNo     = sAny.rollNo     || sAny.RollNo     || "";
+      const studentBloodGroup = sAny.bloodGroup || sAny.BloodGroup || "";
+      const studentAddress    = sAny.address    || sAny.Address    || "";
+      const studentEmergency  = sAny.emergencyContact || sAny.EmergencyContact || sAny.parentContact || sAny.ParentContact || "";
+      const studentParentName = sAny.parentName || sAny.ParentName || "";
+      const studentDOB        = sAny.dob || sAny.DOB
+        ? new Date(sAny.dob || sAny.DOB).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+        : "";
+
+      const renderFieldSet = (fieldSet: any[]) =>
+        (fieldSet || []).filter((f: any) => f.visible).map((f: any) => {
+          const justifyMap: Record<string, string> = { left: "flex-start", center: "center", right: "flex-end" };
+          const justify = justifyMap[f.align || "left"];
+          const st = `position:absolute;left:${f.x}%;top:${f.y}%;width:${f.width}%;height:${f.height}%;z-index:1;`;
           if (f.isImage) {
             let src = "";
             if (f.key === "photo")      src = photoSrc;
             if (f.key === "schoolLogo") src = logoSrc;
             if (f.key === "signature")  src = sigSrc;
             if (!src) return "";
-            return `<img src="${src}" style="${style}object-fit:cover;border-radius:2px;" />`;
+            return `<img src="${src}" style="${st}object-fit:cover;border-radius:2px;" />`;
           }
           let val = "";
-          if (f.key === "studentName")   val = s.fullName || "";
-          if (f.key === "classDivision") val = `${s.className || ""}-${s.divisionName || ""}`;
-          if (f.key === "rollNo")        val = `Roll: ${s.rollNo || ""}`;
-          if (f.key === "dob")           val = `DOB: ${dob}`;
-          if (f.key === "bloodGroup")    val = s.bloodGroup || "";
-          if (f.key === "address")       val = (s as any).currentAddress || "";
-if (f.key === "parentContact") val = (s as any).fatherContact1 || "";
+          if (f.key === "studentName")   val = studentFullName;
+          if (f.key === "classDivision") val = `${studentClassName} - ${studentDivName}`;
+          if (f.key === "rollNo")        val = `Roll: ${studentRollNo}`;
+          if (f.key === "dob")           val = studentDOB ? `DOB: ${studentDOB}` : "";
+          if (f.key === "bloodGroup")    val = studentBloodGroup;
+          if (f.key === "address")       val = studentAddress;
+          if (f.key === "parentContact") val = studentEmergency;
+          if (f.key === "parentName")    val = studentParentName;
           if (!val) return "";
-          return `<div style="${style}font-size:${f.fontSize}px;color:${f.fontColor};
-            font-weight:${f.bold?"bold":"normal"};font-style:${f.italic?"italic":"normal"};
-            white-space:nowrap;overflow:hidden;display:flex;align-items:center;">${val}</div>`;
+          return `<div style="${st}font-size:${f.fontSize}px;color:${f.fontColor || "#000"};font-weight:${f.bold ? "bold" : "normal"};font-style:${f.italic ? "italic" : "normal"};white-space:nowrap;overflow:hidden;display:flex;align-items:center;justify-content:${justify};">${val}</div>`;
         }).join("");
-        return `<div style="position:relative;width:${cardW};height:${cardH};overflow:hidden;page-break-after:always;">
-          ${bg}${fieldsHtml}
-        </div>`;
-      }
 
-      // ── Default layout ──
-      return `<div style="position:relative;width:${cardW};height:${cardH};overflow:hidden;page-break-after:always;">
-        ${bg}
-        <div style="position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;padding:8px;">
-          ${logoSrc ? `<img src="${logoSrc}" style="width:36px;height:36px;object-fit:contain;margin-bottom:4px;" />` : ""}
-          ${photoSrc ? `<img src="${photoSrc}" style="width:48px;height:58px;object-fit:cover;border-radius:3px;margin-bottom:4px;" />` : ""}
-          <p style="font-weight:bold;font-size:10px;color:#000;text-align:center;margin:2px 0;">${s.fullName}</p>
-          <p style="font-size:8px;color:#333;margin:1px 0;">${s.className}-${s.divisionName} | Roll: ${s.rollNo}</p>
-          <p style="font-size:8px;color:#333;margin:1px 0;">DOB: ${dob}</p>
-          <p style="font-size:8px;color:red;font-weight:bold;margin:1px 0;">${s.bloodGroup || ""}</p>
-          ${sigSrc ? `<img src="${sigSrc}" style="height:18px;object-fit:contain;margin-top:auto;" />` : ""}
-        </div>
-      </div>`;
+      const savedTemplate = s.schoolId ? freshTemplateMap[s.schoolId] : null;
+
+      // ── FRONT PAGE ──
+      const frontContent = (savedTemplate && savedTemplate.front.length > 0)
+        ? renderFieldSet(savedTemplate.front)
+        : `<div style="position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;padding:6px;">
+            ${logoSrc  ? `<img src="${logoSrc}"  style="width:32px;height:32px;object-fit:contain;margin-bottom:3px;" />` : ""}
+            ${photoSrc ? `<img src="${photoSrc}" style="width:44px;height:54px;object-fit:cover;border-radius:3px;margin-bottom:3px;" />` : ""}
+            <p style="font-weight:bold;font-size:9px;color:#000;text-align:center;margin:2px 0;">${s.fullName}</p>
+           <p style="font-size:7px;color:#333;margin:1px 0;">${studentClassName}-${studentDivName} | Roll: ${studentRollNo}</p>
+            <p style="font-size:7px;color:#333;margin:1px 0;">DOB: ${dob}</p>
+            <p style="font-size:7px;color:red;font-weight:bold;margin:1px 0;">${studentBloodGroup}</p>
+            ${sigSrc ? `<img src="${sigSrc}" style="height:16px;object-fit:contain;margin-top:auto;" />` : ""}
+           </div>`;
+
+      // ── BACK PAGE ──
+      const backContent = (savedTemplate && savedTemplate.back && savedTemplate.back.length > 0)
+        ? renderFieldSet(savedTemplate.back)
+        : `<div style="position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;gap:4px;">
+            ${logoSrc ? `<img src="${logoSrc}" style="width:36px;height:36px;object-fit:contain;opacity:0.6;" />` : ""}
+            <p style="font-size:7px;color:#fff;text-align:center;opacity:0.9;">If found, please return to school</p>
+           </div>`;
+
+      return `
+<div class="card-page" style="width:${front.w}px;height:${front.h}px;">
+  ${bgFront}${frontContent}
+</div>
+<div class="card-page back" style="width:${back.w}px;height:${back.h}px;">
+  ${bgBack}${backContent}
+</div>`;
     }).join("");
 
+    // ── Use first selected student's school for @page size ──
+    const firstSchool = schools.find(sc => sc.schoolId === selected[0]?.schoolId);
+    const firstOri    = firstSchool ? (orientationMap[firstSchool.schoolId] || { front: "portrait", back: "portrait" }) : { front: "portrait", back: "portrait" };
+    const pageF = cardPx(firstOri.front);
+    const pageB = cardPx(firstOri.back);
+
+    // Convert px back to mm for reliable @page sizing
+    // 204px = 54mm, 323px = 85.6mm
+    const fMmW = pageF.w === 204 ? "54mm" : "85.6mm";
+    const fMmH = pageF.h === 323 ? "85.6mm" : "54mm";
+    const bMmW = pageB.w === 204 ? "54mm" : "85.6mm";
+    const bMmH = pageB.h === 323 ? "85.6mm" : "54mm";
+
     win.document.write(`<!DOCTYPE html>
-<html><head><meta charset="UTF-8"/>
+<html>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=204, initial-scale=1.0"/><meta charset="UTF-8"/>
 <style>
-  *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  @page{size:${cardW} ${cardH};margin:0;}
-  @media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}}
+  * { margin:0; padding:0; box-sizing:border-box; }
+ html, body {
+    margin:0 !important;
+    padding:0 !important;
+    width:${pageF.w}px !important;
+    min-height:${pageF.h}px !important;
+    max-width:${pageF.w}px !important;
+    background:#fff;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+    overflow:hidden;
+  }
+  @page {
+    size: ${fMmW} ${fMmH};
+    margin: 0mm;
+  }
+  @page back-page {
+    size: ${bMmW} ${bMmH};
+    margin: 0mm;
+  }
+  .card-page {
+    position: relative;
+    overflow: hidden;
+    page-break-after: always;
+    break-after: page;
+    margin: 0;
+    padding: 0;
+  }
+  .card-page.back {
+    page: back-page;
+  }
+  @media print {
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: ${pageF.w}px !important;
+      max-width: ${pageF.w}px !important;
+    }
+    .card-page {
+      margin: 0 !important;
+      padding: 0 !important;
+      box-shadow: none !important;
+    }
+  }
 </style>
-</head><body>${cardsHtml}
+</head>
+<body>
+${cardsHtml}
 <script>
-  window.onload=function(){
-    var imgs=document.querySelectorAll('img');var loaded=0;
-    if(!imgs.length){window.print();return;}
-    imgs.forEach(function(img){
-      if(img.complete){loaded++;if(loaded===imgs.length)window.print();}
-      else{img.onload=img.onerror=function(){loaded++;if(loaded===imgs.length)window.print();};}
+  window.onload = function () {
+    var imgs = document.querySelectorAll('img');
+    var total = imgs.length;
+    var done = 0;
+    function tryPrint() {
+      done++;
+      if (done >= total) setTimeout(function () { window.print(); }, 250);
+    }
+    if (!total) { setTimeout(function () { window.print(); }, 250); return; }
+    imgs.forEach(function (img) {
+      if (img.complete && img.naturalHeight !== 0) { tryPrint(); }
+      else { img.onload = img.onerror = tryPrint; }
     });
   };
 <\/script>
-</body></html>`);
+</body>
+</html>`);
     win.document.close();
     setPrinting(false);
   };
@@ -216,7 +461,19 @@ if (f.key === "parentContact") val = (s as any).fatherContact1 || "";
     <div className="space-y-6">
       <PageHeader title="Print ID Cards" description="Select students and print their ID cards" />
 
-      <div className="flex justify-end">
+      {/* <div className="flex justify-end">
+        <a href="/admin/print/designer"
+          className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors">
+          🎨 Card Designer
+        </a>
+      </div> */}
+
+
+      <div className="flex justify-end gap-3">
+        <a href="/admin/addcard"
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors">
+          ➕ Add Card
+        </a>
         <a href="/admin/print/designer"
           className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors">
           🎨 Card Designer
@@ -224,8 +481,8 @@ if (f.key === "parentContact") val = (s as any).fatherContact1 || "";
       </div>
 
       {/* ── Filters ── */}
-      <Card>
-        <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4">
+     <Card suppressHydrationWarning>
+        <CardContent suppressHydrationWarning className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 pt-4">
           {[
             { label: "School",        val: selSchool, set: setSelSchool, items: schools,   key: "schoolId",       name: "schoolName"   },
             { label: "Academic Year", val: selYear,   set: setSelYear,   items: years,     key: "academicYearId", name: "academicYear" },
@@ -249,7 +506,7 @@ if (f.key === "parentContact") val = (s as any).fatherContact1 || "";
       </Card>
 
       {/* ── Main Grid ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Students list */}
         <Card className="xl:col-span-1">
@@ -293,7 +550,7 @@ if (f.key === "parentContact") val = (s as any).fatherContact1 || "";
               disabled={!selectedIds.length || printing}
               onClick={printCards}>
               <Printer className="w-4 h-4 mr-2" />
-              {printing ? "Preparing..." : `Print ${selectedIds.length || ""} Card${selectedIds.length !== 1 ? "s" : ""}`}
+              {printing ? "Preparing..." : `Print ${selectedIds.length || ""} Card${selectedIds.length !== 1 ? "s" : ""} (Front + Back)`}
             </Button>
 
             <Button className="w-full" variant="outline" disabled={!selectedIds.length || printing} onClick={printCards}>
@@ -305,9 +562,22 @@ if (f.key === "parentContact") val = (s as any).fatherContact1 || "";
         {/* Preview */}
         <div className="xl:col-span-2">
           <Card className="h-full">
-            <CardHeader>
-              <CardTitle className="flex gap-2 items-center text-base">
-                <CreditCard className="w-4 h-4" /> Preview
+           <CardHeader>
+              <CardTitle className="flex gap-2 items-center text-base flex-wrap gap-y-2">
+                <CreditCard className="w-4 h-4" />
+                <span>Preview</span>
+                {/* Front / Back toggle */}
+                <div className="flex rounded-lg border overflow-hidden ml-2">
+                  {(["front", "back"] as const).map(side => (
+                    <button key={side}
+                      onClick={() => setPreviewSide(side)}
+                      className={`px-3 py-1 text-xs font-medium transition-colors ${
+                        previewSide === side ? "bg-blue-600 text-white" : "text-gray-500 hover:bg-gray-50"
+                      }`}>
+                      {side === "front" ? "◼ Front" : "◻ Back"}
+                    </button>
+                  ))}
+                </div>
                 {selectedIds.length > 0 && <Badge className="ml-auto">{selectedIds.length} card{selectedIds.length !== 1 ? "s" : ""}</Badge>}
               </CardTitle>
             </CardHeader>
@@ -317,53 +587,39 @@ if (f.key === "parentContact") val = (s as any).fatherContact1 || "";
                     <CreditCard className="w-16 h-16 mb-3" />
                     <p className="text-sm">Select students to preview</p>
                   </div>
-                : <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-[600px] overflow-y-auto pr-1">
+               : <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-[600px] overflow-y-auto pr-1" style={{ gridAutoRows: "min-content" }}>
                     {selectedIds.map(id => {
                       const student = filtered.find(s => s.studentId === id);
                       const school  = schools.find(sc => sc.schoolId === student?.schoolId);
                       if (!student || !school) return null;
+
+                      // Use front fields from templateMap for preview
+                     // Pick front or back fields based on toggle
+                      const previewFields = previewSide === "front"
+                        ? (templateMap[student.schoolId!]?.front || [])
+                        : (templateMap[student.schoolId!]?.back  || []);
+
+                      // Pick correct template image
+                      const previewTemplateSrc = previewSide === "front"
+                        ? school.cardTemplateFront
+                        : school.cardTemplateBack;
+
+                    const previewBg = previewSide === "front"
+                        ? "from-blue-700 to-blue-500"
+                        : "from-slate-600 to-slate-500";
+
+                      // Debug: check if back fields exist
+                      const hasBackFields = (templateMap[student.schoolId!]?.back || []).length > 0;
+                      const dobFormatted = student.dob
+                        ? new Date(student.dob).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                        : "";
+
                       return (
-                        <div key={id} className="space-y-1">
+                         <div key={id} className="space-y-1 w-full min-w-0">
                           <p className="text-[10px] text-slate-500 font-medium truncate">{student.fullName}</p>
-                          {/* Card preview — portrait ratio */}
-                          <div className="relative rounded overflow-hidden" style={{ paddingTop: "158%" }}>
-                            <div className="absolute inset-0">
-                              {school.cardTemplateFront
-  ? <img src={imgSrc(school.cardTemplateFront)} className="absolute inset-0 w-full h-full object-cover" alt="front" />
-  : <div className="absolute inset-0 bg-gradient-to-br from-blue-700 to-blue-500" />
-}
-{/* Overlay saved fields */}
-{(templateMap[student.schoolId!] || []).filter((f: any) => f.visible).map((f: any) => {
-  if (f.isImage) {
-    let src = "";
-    if (f.key === "photo")      src = imgSrc(student.photoPath);
-    if (f.key === "schoolLogo") src = imgSrc(school.schoolLogo);
-    if (f.key === "signature")  src = imgSrc(school.principalSignature);
-    if (!src) return null;
-    return <img key={f.key} src={src} style={{
-      position:"absolute", left:`${f.x}%`, top:`${f.y}%`,
-      width:`${f.width}%`, height:`${f.height}%`, objectFit:"cover", zIndex:1
-    }} />;
-  }
-  const dob = student.dob ? new Date(student.dob).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"}) : "";
-  let val = "";
-  if (f.key === "studentName")   val = student.fullName || "";
-  if (f.key === "classDivision") val = `${student.className||""}-${student.divisionName||""}`;
-  if (f.key === "rollNo")        val = `Roll: ${student.rollNo||""}`;
-  if (f.key === "dob")           val = `DOB: ${dob}`;
-  if (f.key === "bloodGroup")    val = student.bloodGroup || "";
-  if (!val) return null;
-  return <div key={f.key} style={{
-    position:"absolute", left:`${f.x}%`, top:`${f.y}%`,
-    width:`${f.width}%`, height:`${f.height}%`, zIndex:1,
-    fontSize:f.fontSize, color:f.fontColor,
-    fontWeight:f.bold?"bold":"normal", fontStyle:f.italic?"italic":"normal",
-    whiteSpace:"nowrap", overflow:"hidden", display:"flex", alignItems:"center"
-  }}>{val}</div>;
-})}
-                            </div>
-                          </div>
-                          <p className="text-[9px] text-slate-400 text-center">{student.className}-{student.divisionName}</p>
+                          {/* Card preview thumbnail */}
+                       <PreviewCard student={student} school={school} previewSide={previewSide} />
+                          <p className="text-[9px] text-slate-400 text-center">{(student as any).className}-{(student as any).divisionName}</p>
                         </div>
                       );
                     })}

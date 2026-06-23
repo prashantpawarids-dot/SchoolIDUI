@@ -40,15 +40,16 @@ export function DataTable({ columns, data, searchableFields = [], actions }: Dat
       )}
 
       <div className="rounded-lg border border-border overflow-hidden shadow-neumorphic">
-        <Table>
+        <div className="overflow-x-auto">
+        <Table className="min-w-[640px]">
           <TableHeader className="bg-muted/50">
             <TableRow>
               {columns.map((col) => (
-                <TableHead key={col.key} className="font-semibold text-foreground" style={{ width: col.width }}>
+                <TableHead key={col.key} className="font-semibold text-foreground whitespace-nowrap min-w-[100px]" style={{ width: col.width }}>
                   {col.label}
                 </TableHead>
               ))}
-              {actions && <TableHead className="w-24">Actions</TableHead>}
+              {actions && <TableHead className="w-24 min-w-[96px]">Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -75,6 +76,7 @@ export function DataTable({ columns, data, searchableFields = [], actions }: Dat
             )}
           </TableBody>
         </Table>
+        </div>
       </div>
     </div>
   )

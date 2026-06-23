@@ -118,47 +118,101 @@ export default function ManageClasses() {
   }, [selectedSchool])
 
   // ----------------- ADD FUNCTIONS -----------------
+  // const handleAddClass = async () => {
+  //   if (!newClassName || selectedSchool === "" || selectedAcademicYear === "") {
+  //     alert("Please fill all fields")
+  //     return
+  //   }
+  //   try {
+  //     const res = await axios.post<Class>(`${API_BASE}/ClassDivision/addclass`, {
+  //       schoolId: Number(selectedSchool),
+  //       academicYearId: Number(selectedAcademicYear),
+  //       className: newClassName,
+  //     })
+  //     setClasses([...classes, res.data])
+  //     setNewClassName("")
+  //     setSelectedSchool("")
+  //     setSelectedAcademicYear("")
+  //     alert("Class added successfully")
+  //   } catch (err) {
+  //     console.error(err)
+  //     alert("Failed to add class")
+  //   }
+  // }
+
+
   const handleAddClass = async () => {
-    if (!newClassName || selectedSchool === "" || selectedAcademicYear === "") {
-      alert("Please fill all fields")
-      return
-    }
-    try {
-      const res = await axios.post<Class>(`${API_BASE}/ClassDivision/addclass`, {
-        schoolId: Number(selectedSchool),
-        academicYearId: Number(selectedAcademicYear),
-        className: newClassName,
-      })
-      setClasses([...classes, res.data])
-      setNewClassName("")
-      setSelectedSchool("")
-      setSelectedAcademicYear("")
-      alert("Class added successfully")
-    } catch (err) {
-      console.error(err)
-      alert("Failed to add class")
-    }
+  if (!newClassName || selectedSchool === "" || selectedAcademicYear === "") {
+    alert("Please fill all fields")
+    return
   }
 
-  const handleAddDivision = async () => {
-    if (!newDivisionName || selectedClassForDivision === "") {
-      alert("Please select a class and enter a division name.")
-      return
-    }
-    try {
-      const res = await axios.post<Division>(`${API_BASE}/ClassDivision/adddivision`, {
-        classId: Number(selectedClassForDivision),
-        divisionName: newDivisionName,
-      })
-      setDivisions([...divisions, res.data])
-      setNewDivisionName("")
-      setSelectedClassForDivision("")
-      alert("Division added successfully")
-    } catch (err) {
-      console.error(err)
-      alert("Failed to add division. Please try again.")
-    }
+  try {
+    await axios.post(`${API_BASE}/ClassDivision/addclass`, {
+      schoolId: Number(selectedSchool),
+      academicYearId: Number(selectedAcademicYear),
+      className: newClassName,
+    })
+
+    await fetchClasses();
+
+    setNewClassName("")
+    setSelectedSchool("")
+    setSelectedAcademicYear("")
+
+    alert("Class added successfully")
+  } catch (err) {
+    console.error(err)
+    alert("Failed to add class")
   }
+}
+
+  // const handleAddDivision = async () => {
+  //   if (!newDivisionName || selectedClassForDivision === "") {
+  //     alert("Please select a class and enter a division name.")
+  //     return
+  //   }
+  //   try {
+  //     const res = await axios.post<Division>(`${API_BASE}/ClassDivision/adddivision`, {
+  //       classId: Number(selectedClassForDivision),
+  //       divisionName: newDivisionName,
+  //     })
+  //     setDivisions([...divisions, res.data])
+  //     setNewDivisionName("")
+  //     setSelectedClassForDivision("")
+  //     alert("Division added successfully")
+  //   } catch (err) {
+  //     console.error(err)
+  //     alert("Failed to add division. Please try again.")
+  //   }
+  // }
+
+
+  const handleAddDivision = async () => {
+  if (!newDivisionName || selectedClassForDivision === "") {
+    alert("Please select a class and enter a division name.")
+    return
+  }
+
+  try {
+    await axios.post(`${API_BASE}/ClassDivision/adddivision`, {
+      classId: Number(selectedClassForDivision),
+      divisionName: newDivisionName,
+    })
+
+    // Reload latest data from DB
+    await fetchClasses();
+
+    // Reset form
+    setNewDivisionName("")
+    setSelectedClassForDivision("")
+
+    alert("Division added successfully")
+  } catch (err) {
+    console.error(err)
+    alert("Failed to add division. Please try again.")
+  }
+}
 
   // ----------------- EDIT FUNCTIONS -----------------
   const handleEditClass = async () => {

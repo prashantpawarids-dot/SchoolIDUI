@@ -238,10 +238,10 @@ useEffect(() => {
 
       {/* Filters */}
       <Card className="shadow-lg border-0">
-        <CardContent className="p-4 flex flex-wrap gap-4">
+        <CardContent className="p-3 md:p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
           {/* School */}
           <Select value={selectedSchool} onValueChange={setSelectedSchool}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Select School" />
             </SelectTrigger>
             <SelectContent>
@@ -259,7 +259,7 @@ useEffect(() => {
             value={selectedYear}
             onValueChange={setSelectedYear}
             disabled={selectedSchool === "all"}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Select Academic Year" />
             </SelectTrigger>
             <SelectContent>
@@ -279,7 +279,7 @@ useEffect(() => {
             value={selectedClass}
             onValueChange={setSelectedClass}
             disabled={selectedSchool === "all"}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Select Class" />
             </SelectTrigger>
             <SelectContent>
@@ -297,7 +297,7 @@ useEffect(() => {
             value={selectedDivision}
             onValueChange={setSelectedDivision}
             disabled={selectedClass === "all"}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Select Division" />
             </SelectTrigger>
             <SelectContent>
@@ -311,7 +311,7 @@ useEffect(() => {
           </Select>
 
           {/* Search */}
-          <div className="relative flex-1">
+          <div className="relative sm:col-span-2 lg:col-span-3 xl:col-span-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search by name or roll no"
@@ -324,10 +324,34 @@ useEffect(() => {
       </Card>
 
       {/* Students Table */}
+      {/* Approve All filtered pending students */}
+      {filteredStudents.filter(s => s.status === "Pending").length > 0 && (
+        <div className="flex justify-end">
+          <Button
+            className="bg-green-600 hover:bg-green-700 text-white"
+            onClick={async () => {
+              if (!confirm(`Approve all ${filteredStudents.filter(s => s.status === "Pending").length} pending students?`)) return;
+              const pending = filteredStudents.filter(s => s.status === "Pending");
+              for (const s of pending) {
+                await fetch(`${API_BASE_URL}/Student/applications/update/${s.studentId}?status=accept&remarks=`, { method: "PUT" });
+              }
+              setStudents(prev => prev.map(s =>
+                pending.find(p => p.studentId === s.studentId)
+                  ? { ...s, status: "Approved" as const }
+                  : s
+              ));
+            }}>
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Approve All ({filteredStudents.filter(s => s.status === "Pending").length} Pending)
+          </Button>
+        </div>
+      )}
+
+      {/* Students Table */}
       <Card className="shadow-lg border-0">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[800px]">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
                   <th className="text-left p-4 font-semibold">Student</th>

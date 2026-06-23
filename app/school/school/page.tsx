@@ -233,7 +233,8 @@ export default function AdminSchoolsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <table className="w-full border-collapse">
+          <div className="overflow-x-auto">
+          <table className="w-full border-collapse min-w-[720px]">
             <thead>
               <tr className="border-b">
                 <th className="text-left p-2">SrNo</th>
@@ -273,6 +274,7 @@ export default function AdminSchoolsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </CardContent>
       </Card>
 
@@ -285,7 +287,7 @@ export default function AdminSchoolsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 max-h-[80vh] overflow-y-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>School Name</Label>
                 <Input
@@ -359,7 +361,7 @@ export default function AdminSchoolsPage() {
             <CardTitle>Add Academic Year</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>Select School</Label>
                 <Select

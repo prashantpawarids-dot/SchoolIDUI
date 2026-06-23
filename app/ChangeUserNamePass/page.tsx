@@ -167,7 +167,7 @@ useEffect(() => {
       <div className="flex items-center gap-3">
         <Button variant="outline" size="sm" onClick={() => router.back()}>← Back</Button>
         <div>
-          <h1 className="text-2xl font-bold">Change User Credentials</h1>
+          <h1 className="text-xl md:text-2xl lg:text-3xl font-bold">Change User Credentials</h1>
           <p className="text-sm text-muted-foreground">
             {isParent ? "Update your own login details" : "Search and update user login details"}
           </p>
@@ -183,7 +183,7 @@ useEffect(() => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <div>
                 <Label className="mb-1.5 block">School</Label>
                 <Select value={filterSchool} onValueChange={v => {

@@ -222,7 +222,7 @@ fetch(`${BASE_URL}/Student/getalwithstatus?schoolId=${schoolId}`)
       />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
         {stats.map((stat) => (
           <StatCard key={stat.id} {...stat} />
         ))}
@@ -238,7 +238,7 @@ fetch(`${BASE_URL}/Student/getalwithstatus?schoolId=${schoolId}`)
           <CardDescription>Frequently used features</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {quickActions.map((action) => (
               <Link key={action.id} href={action.href} passHref>
                 <div className="p-4 border border-border rounded-xl hover:shadow-md hover:border-primary/30 cursor-pointer transition-all group">
@@ -262,7 +262,7 @@ fetch(`${BASE_URL}/Student/getalwithstatus?schoolId=${schoolId}`)
 
       {/* Recent Pending Students */}
       <Card className="shadow-lg border-0">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <CardTitle>Recent Pending Students</CardTitle>
             <CardDescription>
@@ -281,7 +281,7 @@ fetch(`${BASE_URL}/Student/getalwithstatus?schoolId=${schoolId}`)
             {recentStudents.map((student, idx) => (
               <div
                 key={student.studentId ?? idx}
-                className="flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <span className="text-sm font-semibold text-primary">

@@ -174,7 +174,7 @@ export default function ManageCredentialsPage() {
         <CardContent className="space-y-4">
 
           {/* ── Filters ── */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
 
             {/* School — only for SuperAdmin/Admin */}
             {(roleId === 1 || roleId === 2) && (
@@ -235,7 +235,7 @@ export default function ManageCredentialsPage() {
 
           {/* ── Table ── */}
           <div className="overflow-x-auto rounded border">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead className="bg-muted/40">
                 <tr>
                   <th className="p-2 text-left">SrNo</th>

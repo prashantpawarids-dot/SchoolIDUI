@@ -303,7 +303,7 @@ export default function ImportExcelPage() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {/* School */}
             <div className="space-y-1.5">
               <Label>School <span className="text-destructive">*</span></Label>
@@ -481,7 +481,7 @@ export default function ImportExcelPage() {
 
           <CardContent className="space-y-4">
             <div className="overflow-x-auto rounded-lg border">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[640px]">
                 <thead className="bg-muted/40">
                   <tr>
                     {["#", "Division", "Roll No", "Student Name", "DOB", "Blood Group", "Parent", "Contact"].map((h) => (
@@ -558,7 +558,7 @@ export default function ImportExcelPage() {
           </CardHeader>
 
           <CardContent className="space-y-4 overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead className="bg-muted/40">
                 <tr>
                   {["Row", "Roll No", "Student", "Result", "Message"].map((h) => (

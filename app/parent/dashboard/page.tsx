@@ -58,6 +58,8 @@ interface ParentStudent {
   divisionName: string;
   rollNo: string;
   address: string;
+  emergencyContact: string;
+  parentName: string;
   photo: string | null;
   status: "Approved" | "Pending" | "Rejected";
   rejectionReason?: string;
@@ -70,6 +72,10 @@ export default function ParentDashboard() {
   const [schoolId, setSchoolId] = useState<number | null>(null);
   const [schoolName, setSchoolName] = useState("");
   const [schoolLogo, setSchoolLogo] = useState("");
+  const [schoolCardTemplate, setSchoolCardTemplate] = useState("");
+  const [schoolCardTemplateBack, setSchoolCardTemplateBack] = useState("");
+  const [schoolSignature, setSchoolSignature] = useState("");
+  const [templateFields, setTemplateFields] = useState<{ front: any[]; back: any[] }>({ front: [], back: [] });
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
   // const API_BASE_URL = "/api/proxy";
 
@@ -91,8 +97,20 @@ export default function ParentDashboard() {
       );
       if (school) {
         setSchoolName(school.schoolName);
-        // setSchoolLogo(`data:image/jpeg;base64,${school.schoolLogo}`);
         setSchoolLogo(imgUrl(school.schoolLogo));
+        setSchoolCardTemplate(school.cardTemplateFront || "");
+        setSchoolCardTemplateBack(school.cardTemplateBack || "");
+        setSchoolSignature(school.principalSignature || "");
+
+        // Load saved designer field positions
+        try {
+          const tRes = await fetch(`${API_BASE_URL}/CardTemplate/list?schoolId=${school.schoolId}`);
+          const tData = await tRes.json();
+          if (tData?.length > 0 && tData[0].templateFieldsJson) {
+            const parsed = JSON.parse(tData[0].templateFieldsJson);
+            if (parsed?.front) setTemplateFields({ front: parsed.front, back: parsed.back || [] });
+          }
+        } catch {}
       }
     };
     fetchSchool();
@@ -130,9 +148,11 @@ export default function ParentDashboard() {
     className:       student.className,
     divisionId:      student.divisionId,
     divisionName:    student.divisionName,
-    rollNo:          student.rollNo || "",
-    address:         student.address,
-    photo:           student.photoPath || null,
+    rollNo:           student.rollNo || "",
+    address:          student.address,
+    emergencyContact: student.emergencyContact || "",
+    parentName:       student.parentName || "",
+    photo:            student.photoPath || null,
     status:          normalizedStatus,
     rejectionReason: student.applicationRemarks || undefined,
     submittedDate:   null,
@@ -160,7 +180,7 @@ setStudents(studentsWithStatus);
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
 
         
         <Card className="shadow-lg border-0 bg-blue-50">
@@ -169,7 +189,7 @@ setStudents(studentsWithStatus);
               <GraduationCap className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{students.length}</p>
+              <p className="text-xl md:text-2xl font-bold">{students.length}</p>
               <p className="text-sm text-muted-foreground">Total Students</p>
             </div>
           </CardContent>
@@ -193,7 +213,7 @@ setStudents(studentsWithStatus);
               <Clock className="w-6 h-6 text-amber-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{pendingCount}</p>
+              <p className="text-xl md:text-2xl font-bold">{pendingCount}</p>
               <p className="text-sm text-muted-foreground">Pending</p>
             </div>
           </CardContent>
@@ -205,7 +225,7 @@ setStudents(studentsWithStatus);
               <AlertCircle className="w-6 h-6 text-red-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{rejectedCount}</p>
+              <p className="text-xl md:text-2xl font-bold">{rejectedCount}</p>
               <p className="text-sm text-muted-foreground">Rejected</p>
             </div>
           </CardContent>
@@ -296,144 +316,94 @@ setStudents(studentsWithStatus);
                         </DialogTitle>
                       </DialogHeader>
 
-                      <div className="mt-4">
-                        {/* ID Card Design */}
-                        <div className="relative w-full max-w-sm mx-auto aspect-[3/4] bg-gradient-to-br from-green-600 to-green-700 rounded-lg shadow-xl overflow-hidden">
-                          {/* Decorative background pattern */}
-                          <div className="absolute inset-0 opacity-20">
-                            <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-green-400 to-transparent"></div>
-                            <div className="absolute bottom-0 right-0 w-48 h-48 bg-green-800 rounded-tl-full"></div>
+                     <div className="mt-4">
+                        {/* Front + Back side by side with designer field positions */}
+                        <div className="flex gap-3 justify-center">
+
+                          {/* FRONT */}
+                          <div className="flex-1 max-w-[48%]">
+                            <p className="text-xs text-center text-gray-400 mb-1 font-medium">◼ Front</p>
+                            <div className="relative rounded-lg overflow-hidden shadow-md" style={{ paddingTop: "158%", backgroundColor: "#d1d5db" }}>
+                              <div className="absolute inset-0">
+                                {schoolCardTemplate
+                                  ? <img src={imgUrl(schoolCardTemplate)} className="absolute inset-0 w-full h-full object-cover" alt="front" />
+                                  : <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-blue-800" />
+                                }
+                                {templateFields.front.filter((f: any) => f.visible).map((f: any) => {
+                                  const dobFmt = student.dob ? new Date(student.dob).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "";
+                                  if (f.isImage) {
+                                    let src = "";
+                                    if (f.key === "photo")      src = imgUrl(student.photo);
+                                    if (f.key === "schoolLogo") src = schoolLogo;
+                                    if (!src) return null;
+                                    return <img key={f.key} src={src} style={{ position:"absolute", left:`${f.x}%`, top:`${f.y}%`, width:`${f.width}%`, height:`${f.height}%`, objectFit:"cover", zIndex:1 }} alt="" />;
+                                  }
+                                  let val = "";
+                                  if (f.key === "studentName")   val = student.fullName;
+                                  if (f.key === "classDivision") val = `${student.className} - ${student.divisionName}`;
+                                  if (f.key === "rollNo")        val = `Roll: ${student.rollNo}`;
+                                  if (f.key === "dob")           val = `DOB: ${dobFmt}`;
+                                  if (f.key === "bloodGroup")    val = student.bloodGroup;
+                                  if (f.key === "address")       val = student.address;
+                                  if (!val) return null;
+                                  const jMap: any = { left:"flex-start", center:"center", right:"flex-end" };
+                                  return <div key={f.key} style={{ position:"absolute", left:`${f.x}%`, top:`${f.y}%`, width:`${f.width}%`, height:`${f.height}%`, zIndex:1, fontSize:f.fontSize, color:f.fontColor||"#000", fontWeight:f.bold?"bold":"normal", fontStyle:f.italic?"italic":"normal", whiteSpace:"nowrap", overflow:"hidden", display:"flex", alignItems:"center", justifyContent:jMap[f.align||"left"] }}>{val}</div>;
+                                })}
+                              </div>
+                            </div>
                           </div>
 
-                          {/* Content */}
-                          <div className="relative z-10 h-full flex flex-col p-6">
-                            {/* Header with logo and school name */}
-                            <div className="flex items-center gap-3 mb-6">
-                              {schoolLogo && (
-                                <img
-                                  src={schoolLogo}
-                                  alt="School Logo"
-                                  className="w-12 h-12 rounded-full bg-white p-1"
-                                />
-                              )}
-                              <div className="flex-1">
-                                <h2 className="text-white font-bold text-base leading-tight uppercase">
-                                  {schoolName || "RISE ABOVE"}
-                                </h2>
-                                
+                          
+                          {/* BACK */}
+                          <div className="flex-1 max-w-[48%]">
+                            <p className="text-xs text-center text-gray-400 mb-1 font-medium">◻ Back</p>
+                            <div className="relative rounded-lg overflow-hidden shadow-md" style={{ paddingTop: "158%", backgroundColor: "#d1d5db" }}>
+                              <div className="absolute inset-0">
+                                {schoolCardTemplateBack
+                                  ? <img src={imgUrl(schoolCardTemplateBack)} className="absolute inset-0 w-full h-full object-cover" alt="back" />
+                                  : <div className="absolute inset-0 bg-gradient-to-br from-slate-200 to-slate-300" />
+                                }
+                               {templateFields.back.filter((f: any) => f.visible).map((f: any) => {
+                                  if (f.isImage) {
+                                    let src = "";
+                                    if (f.key === "schoolLogo") src = schoolLogo;
+                                    if (f.key === "signature")  src = imgUrl(schoolSignature);
+                                    if (f.key === "photo")      src = imgUrl(student.photo);
+                                    if (!src) return null;
+                                    return <img key={f.key} src={src} style={{ position:"absolute", left:`${f.x}%`, top:`${f.y}%`, width:`${f.width}%`, height:`${f.height}%`, objectFit:"cover", zIndex:1 }} alt="" />;
+                                  }
+                                  let val = "";
+                                  if (f.key === "studentName")   val = student.fullName;
+                                  if (f.key === "classDivision") val = `${student.className} - ${student.divisionName}`;
+                                  if (f.key === "address")       val = student.address;
+                                 if (f.key === "parentContact") val = student.emergencyContact || "";
+                                  if (f.key === "parentName")    val = student.parentName || "";
+                                  if (!val) return null;
+                                  const jMap: any = { left:"flex-start", center:"center", right:"flex-end" };
+                                  return <div key={f.key} style={{ position:"absolute", left:`${f.x}%`, top:`${f.y}%`, width:`${f.width}%`, height:`${f.height}%`, zIndex:1, fontSize:f.fontSize, color:f.fontColor||"#000", fontWeight:f.bold?"bold":"normal", fontStyle:f.italic?"italic":"normal", whiteSpace:"nowrap", overflow:"hidden", display:"flex", alignItems:"center", justifyContent:jMap[f.align||"left"] }}>{val}</div>;
+                                })}
                               </div>
-                            </div>
-
-                            {/* Student Photo */}
-                            <div className="flex justify-center mb-4">
-                              <div className="w-28 h-28 rounded-full border-4 border-white overflow-hidden bg-white shadow-lg">
-                                {student.photo ? (
-                                  <img
-                                    // src={`data:image/jpeg;base64,${student.photo}`}
-                                    src={imgUrl(student.photo)}
-                                    alt={student.fullName}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                                    <User className="w-12 h-12 text-gray-400" />
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Student Name */}
-                            <div className="text-center mb-6">
-                              <h3 className="text-white font-bold text-lg">
-                                {student.fullName}
-                              </h3>
-                              <p className="text-white text-sm">
-                                Std. {student.className} | Class: {student.divisionName}
-                              </p>
-                            </div>
-
-                            {/* Info with Icons */}
-                            <div className="space-y-3 text-white text-sm flex-1">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                                  <FileText className="w-4 h-4" />
-                                </div>
-                                <span className="font-medium">{student.rollNo || "N/A"}</span>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                                  <Cake className="w-4 h-4" />
-                                </div>
-                                <span>
-                                  {new Date(student.dob).toLocaleDateString("en-GB", {
-                                    day: "numeric",
-                                    month: "long",
-                                    year: "numeric",
-                                  })}
-                                </span>
-                              </div>
-                              <div className="flex items-start gap-3">
-                                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                                  <Home className="w-4 h-4" />
-                                </div>
-                                <span className="flex-1 line-clamp-3 text-xs leading-relaxed">
-                                  {student.address}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Status Badge at Bottom */}
-                            <div className="mt-4 flex justify-center">
-                              <Badge
-                                className={`px-4 py-1.5 rounded-full text-white text-sm font-semibold shadow-lg ${
-                                  student.status === "Approved"
-                                    ? "bg-green-500"
-                                    : student.status === "Pending"
-                                    ? "bg-amber-500"
-                                    : "bg-red-500"
-                                }`}>
-                                {student.status}
-                              </Badge>
                             </div>
                           </div>
+
                         </div>
 
-                        {/* Additional Info Below Card */}
+                        {/* Status */}
+                        <div className="mt-3 flex justify-center">
+                          <Badge className={`px-4 py-1.5 rounded-full text-white text-sm font-semibold ${student.status==="Approved"?"bg-green-500":student.status==="Pending"?"bg-amber-500":"bg-red-500"}`}>
+                            {student.status}
+                          </Badge>
+                        </div>
+
                         {student.status === "Rejected" && student.rejectionReason && (
-                          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                            <p className="text-sm text-red-600">
-                              <span className="font-semibold">Rejection Reason:</span>{" "}
-                              {student.rejectionReason}
-                            </p>
+                          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <p className="text-sm text-red-600"><span className="font-semibold">Rejection Reason:</span> {student.rejectionReason}</p>
                           </div>
                         )}
 
-                        <div className="mt-4 text-center text-sm text-gray-600">
-                          <p>
-                            <span className="font-semibold">Blood Group:</span> {student.bloodGroup}
-                          </p>
-                          <p className="mt-1">
-                            <span className="font-semibold">Submitted:</span>{" "}
-                            {student.submittedDate
-                              ? new Date(student.submittedDate).toLocaleDateString("en-GB", {
-                                  day: "2-digit",
-                                  month: "long",
-                                  year: "numeric",
-                                })
-                              : "N/A"}
-                          </p>
-                        </div>
+                       
                       </div>
-
-                      <div className="mt-6 text-right">
-                        <Button
-                          variant="outline"
-                          onClick={() =>
-                            document.querySelector("dialog")?.close()
-                          }>
-                          Close
-                        </Button>
-                      </div>
+                     
                     </DialogContent>
                   </Dialog>
                 </div>

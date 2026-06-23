@@ -2,6 +2,7 @@
 import type React from "react"
 import { ToastProvider, ToastViewport } from "@/components/ui/toast"
 import "./globals.css"
+import "react-image-crop/dist/ReactCrop.css";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

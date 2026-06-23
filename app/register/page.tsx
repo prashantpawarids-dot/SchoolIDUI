@@ -1,12 +1,13 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import ReactCrop, { centerCrop, makeAspectCrop, type Crop, type PixelCrop } from "react-image-crop"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL
 
@@ -65,6 +66,54 @@ useEffect(() => {
   const [isLoading, setIsLoading] = useState(false)
   const [credentials, setCredentials] = useState<{ username: string; password: string } | null>(null)
 
+  // ── Admin logo upload + crop (Admin role only) ──
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const [showCropper, setShowCropper] = useState(false)
+  const [imgSrc, setImgSrc] = useState("")
+  const [crop, setCrop] = useState<Crop>()
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop>()
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  const onSelectLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      setImgSrc(reader.result?.toString() ?? "")
+      setShowCropper(true)
+      setCrop(undefined)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth: width, naturalHeight: height } = e.currentTarget
+    const c = centerCrop(
+      makeAspectCrop({ unit: "%", width: 80 }, 1, width, height),
+      width, height
+    )
+    setCrop(c)
+  }
+
+  const saveCroppedLogo = async () => {
+    if (!completedCrop || !imgRef.current) return
+    const canvas = document.createElement("canvas")
+    const scaleX = imgRef.current.naturalWidth / imgRef.current.width
+    const scaleY = imgRef.current.naturalHeight / imgRef.current.height
+    canvas.width = completedCrop.width
+    canvas.height = completedCrop.height
+    const ctx = canvas.getContext("2d")!
+    ctx.drawImage(
+      imgRef.current,
+      completedCrop.x * scaleX, completedCrop.y * scaleY,
+      completedCrop.width * scaleX, completedCrop.height * scaleY,
+      0, 0, completedCrop.width, completedCrop.height
+    )
+    setLogoPreview(canvas.toDataURL("image/jpeg", 0.95))
+    setShowCropper(false)
+    setImgSrc("")
+  }
+
   const selectedRole = Number(formData.roleId)
   // School dropdown needed: admin creating Parent or School
 const needsSchool = isAdmin && (selectedRole === 2 || selectedRole === 3 || selectedRole === 4)
@@ -119,6 +168,18 @@ try {
     : needsSchool ? Number(formData.schoolId)
     : null                                       // admin creating admin — no school
 
+      // Upload admin logo first, if one was cropped (Admin role only)
+      let adminLogoUrl = ""
+      if (selectedRole === 1 && logoPreview) {
+        const blob = await (await fetch(logoPreview)).blob()
+        const file = new File([blob], "admin-logo.jpg", { type: "image/jpeg" })
+        const fd = new FormData()
+        fd.append("file", file)
+        const uploadRes = await fetch(`${API_BASE}/File/upload/adminlogo`, { method: "POST", body: fd })
+        const uploadData = await uploadRes.json()
+        if (uploadData?.success) adminLogoUrl = uploadData.url
+      }
+
       const res = await fetch(`${API_BASE}/Auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -134,6 +195,7 @@ try {
           contact: formData.contact,
           createdByRoleId: loggedInRoleId,    // ✅ send who is creating
           createdBySchoolId: loggedInSchoolId, // ✅ send their schoolId
+          adminLogo: adminLogoUrl || null,
         }),
       })
 
@@ -149,6 +211,7 @@ try {
       setCredentials({ username: data.username, password: data.password })
 
       // Reset form
+      // Reset form
       setFormData({
         schoolId: isSchool ? loggedInSchoolId.toString() : "",
         academicYearId: "",
@@ -156,6 +219,7 @@ try {
         firstName: "", middleName: "", lastName: "",
         email: "", address: "", contact: "",
       })
+      setLogoPreview(null)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -169,7 +233,7 @@ return (
   <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6">
       <Card className="w-full max-w-4xl shadow-lg p-6">
         <CardHeader className="text-center mb-6">
-          <CardTitle className="text-3xl">
+          <CardTitle className="text-xl md:text-2xl lg:text-3xl">
             {isSchool ? "Add New Parent" : "Add New User"}
           </CardTitle>
           <CardDescription>
@@ -207,7 +271,7 @@ return (
           <form className="space-y-5" onSubmit={handleSubmit}>
 
             {/* Role — admin sees dropdown, school sees fixed "Parent" */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <div>
                 <Label>Role <span className="text-red-500">*</span></Label>
                 {isAdmin ? (
@@ -232,6 +296,22 @@ return (
   </Select>
 )}
               </div>
+
+              {/* School dropdown — admin only, when creating Parent or School */}
+              {/* Admin Logo upload — only when creating an Admin */}
+              {isAdmin && selectedRole === 1 && (
+                <div>
+                  <Label>Admin Logo</Label>
+                  <div className="flex items-center gap-3">
+                    <div className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden bg-gray-50 shrink-0">
+                      {logoPreview
+                        ? <img src={logoPreview} className="w-full h-full object-cover" alt="logo preview" />
+                        : <span className="text-gray-300 text-xl">🖼</span>}
+                    </div>
+                    <Input type="file" accept="image/*" onChange={onSelectLogo} className="text-sm" />
+                  </div>
+                </div>
+              )}
 
               {/* School dropdown — admin only, when creating Parent or School */}
               {isAdmin && needsSchool && (
@@ -270,7 +350,7 @@ return (
             </div>
 
             {/* Name */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <div>
                 <Label>First Name <span className="text-red-500">*</span></Label>
                 <Input value={formData.firstName}
@@ -289,7 +369,7 @@ return (
             </div>
 
             {/* Contact */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Email <span className="text-red-500">*</span></Label>
                 <Input type="email" value={formData.email}
@@ -317,6 +397,31 @@ return (
               </Button>
             </div>
           </form>
+
+          {/* Crop Modal — admin logo */}
+          {showCropper && imgSrc && (
+            <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-4">
+              <div className="bg-white rounded-xl shadow-2xl p-4 w-full max-w-lg">
+                <h3 className="text-base font-semibold mb-3 text-center">✂️ Crop Logo</h3>
+                <div className="flex justify-center overflow-auto max-h-[60vh]">
+                  <ReactCrop
+                    crop={crop}
+                    onChange={c => setCrop(c)}
+                    onComplete={c => setCompletedCrop(c)}
+                    aspect={1}
+                    minWidth={50}
+                    minHeight={50}
+                  >
+                    <img ref={imgRef} src={imgSrc} onLoad={onImageLoad} style={{ maxWidth: "100%", maxHeight: "55vh" }} alt="crop-source" />
+                  </ReactCrop>
+                </div>
+                <div className="flex gap-3 mt-4 justify-center">
+                  <Button type="button" onClick={saveCroppedLogo} className="bg-green-600 hover:bg-green-700 px-6">✅ Save Crop</Button>
+                  <Button type="button" variant="outline" onClick={() => { setShowCropper(false); setImgSrc("") }}>Cancel</Button>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

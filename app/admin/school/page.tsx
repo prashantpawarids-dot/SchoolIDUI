@@ -1,5 +1,5 @@
 "use client";
-import { imgUrl } from "@/lib/image-utils"
+import { imgUrl } from "@/lib/image-utils";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +18,6 @@ import { Edit2, Trash2, Upload, Eye } from "lucide-react";
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL + "/School";
 
 export default function AdminSchoolsPage() {
- 
   const [showAddSchool, setShowAddSchool] = useState(false);
   const [showAddYear, setShowAddYear] = useState(false);
   const [editingSchoolId, setEditingSchoolId] = useState<number | null>(null);
@@ -42,57 +41,45 @@ export default function AdminSchoolsPage() {
     academicYear: "",
   });
 
-  // useEffect(() => {
-  //   loadSchools();
-  // }, []);
+  const [cardOrientation, setCardOrientation] = useState<"portrait" | "landscape">("portrait");
 
-  // const loadSchools = async () => {
-  //   try {
-  //     const res = await fetch(`${BASE_URL}/list`);
-  //     const data = await res.json();
-  //     setSchools(data);
-  //   } catch (error) {
-  //     console.error("Failed to load schools:", error);
-  //   }
-  // };
+ 
 
-  // ✅ CHANGED: replaced handleLogoFile with generic handleFileToBase64
-  // const handleFileToBase64 = (e: any, field: string) => {
-  //   const file = e.target.files[0];
-  //   if (!file) return;
-  //   const reader = new FileReader();
-  //   reader.onload = () => {
-  //     setSchoolForm((prev: any) => ({
-  //       ...prev,
-  //       [field]: reader.result?.toString() || "",
-  //     }));
-  //   };
-  //   reader.readAsDataURL(file);
-  // };
+const handleFileToBase64 = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: string,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
+    // Show local preview instantly — no waiting
+    const localPreview = URL.createObjectURL(file);
+    setSchoolForm((prev: any) => ({ ...prev, [field]: localPreview }));
 
-  const handleFileToBase64 = async (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
-  const file = e.target.files?.[0]
-  if (!file) return
+    const formData = new FormData();
+    formData.append("file", file);
 
-  const formData = new FormData()
-  formData.append("file", file)
-
-  try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/File/upload/schools`,
-      { method: "POST", body: formData }
-    )
-    const data = await res.json()
-    if (data.success) {
-      setSchoolForm((prev: any) => ({ ...prev, [field]: data.url }))
-    } else {
-      alert("Upload failed: " + data.message)
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/File/upload/schools`,
+        { method: "POST", body: formData }
+      );
+      const data = await res.json();
+      if (data.success) {
+        // Silently replace blob URL with server URL — preview stays visible
+        setSchoolForm((prev: any) => ({
+          ...prev,
+          [field]: data.url + `?t=${Date.now()}`,
+        }));
+      } else {
+        // Keep local preview, just warn
+        console.warn("Upload failed:", data.message);
+      }
+    } catch {
+      // Keep local preview on network error
+      console.warn("Upload failed, keeping local preview");
     }
-  } catch {
-    alert("Upload failed")
-  }
-}
+  };
 
   const saveSchool = async () => {
     if (!schoolForm.schoolName || !schoolForm.contactNumber) {
@@ -117,9 +104,20 @@ export default function AdminSchoolsPage() {
         principalSignature: schoolForm.principalSignature,
       };
 
+      // const res = await fetch(url, {
+      //   method: editingSchoolId ? "PUT" : "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify(payload),
+      // });
+
+      const userId = localStorage.getItem("userId");
+
       const res = await fetch(url, {
         method: editingSchoolId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          userId: userId || "",
+        },
         body: JSON.stringify(payload),
       });
 
@@ -145,16 +143,16 @@ export default function AdminSchoolsPage() {
         cardTemplateBack: "",
         principalSignature: "",
       });
-    reloadSchools();
+      reloadSchools();
     } catch (error: any) {
       console.error("Error saving school:", error);
       alert("Failed to save school");
     }
   };
-const formatImage = (img: string) => {
-  if (!img) return "";
-  return img.startsWith("data:image") ? img : `data:image/png;base64,${img}`;
-};
+  const formatImage = (img: string) => {
+    if (!img) return "";
+    return img.startsWith("data:image") ? img : `data:image/png;base64,${img}`;
+  };
 
   const editSchool = (school: any) => {
     setEditingSchoolId(school.schoolId);
@@ -163,13 +161,13 @@ const formatImage = (img: string) => {
       schoolAddress: school.schoolAddress || "",
       contactPerson: school.contactPerson || "",
       contactNumber: school.contactNumber || "",
-    //   schoolLogo: formatImage(school.schoolLogo),
-    //  cardTemplateFront: formatImage(school.cardTemplateFront),
-    //  cardTemplateBack: formatImage(school.cardTemplateBack),
-    //  principalSignature: formatImage(school.principalSignature),
-      schoolLogo:         school.schoolLogo         || "",
-     cardTemplateFront:  school.cardTemplateFront  || "",
-      cardTemplateBack:   school.cardTemplateBack   || "",
+      //   schoolLogo: formatImage(school.schoolLogo),
+      //  cardTemplateFront: formatImage(school.cardTemplateFront),
+      //  cardTemplateBack: formatImage(school.cardTemplateBack),
+      //  principalSignature: formatImage(school.principalSignature),
+      schoolLogo: school.schoolLogo || "",
+      cardTemplateFront: school.cardTemplateFront || "",
+      cardTemplateBack: school.cardTemplateBack || "",
       principalSignature: school.principalSignature || "",
     });
     setShowAddSchool(true);
@@ -241,59 +239,84 @@ const formatImage = (img: string) => {
                   cardTemplateBack: "",
                   principalSignature: "",
                 });
-              }}>
+              }}
+            >
               ➕ Add School
             </Button>
             <Button
               onClick={() => {
                 setShowAddYear(true);
                 setShowAddSchool(false);
-              }}>
+              }}
+            >
               ➕ Add Academic Year
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left p-2">SrNo</th>
-                <th className="text-left p-2">School Name</th>
-                <th className="text-left p-2">Address</th>
-                <th className="text-left p-2">Contact</th>
-                {/* ✅ CHANGED: added Template column */}
-                <th className="text-left p-2">Template</th>
-                <th className="text-left p-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {schools.map((school, idx) => (
-                <tr key={school.schoolId} className="border-b hover:bg-gray-50">
-                  <td className="p-2">{idx + 1}</td>
-                  <td className="p-2">{school.schoolName}</td>
-                  <td className="p-2">{school.schoolAddress}</td>
-                  <td className="p-2">{school.contactNumber}</td>
-                  {/* ✅ CHANGED: show template upload status */}
-                  <td className="p-2">
-                    {school.cardTemplateFront
-                      ? <span className="text-green-600 text-xs font-medium">✅ Uploaded</span>
-                      : <span className="text-amber-500 text-xs">⚠ No Template</span>}
-                  </td>
-                  <td className="p-2 flex gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => viewSchoolCard(school)}>
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => editSchool(school)}>
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => deleteSchool(school.schoolId)}>
-                      <Trash2 className="w-4 h-4 text-red-500" />
-                    </Button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse min-w-[720px]">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-2">SrNo</th>
+                  <th className="text-left p-2">School Name</th>
+                  <th className="text-left p-2">Address</th>
+                  <th className="text-left p-2">Contact</th>
+                  {/* ✅ CHANGED: added Template column */}
+                  <th className="text-left p-2">Template</th>
+                  <th className="text-left p-2">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {schools.map((school, idx) => (
+                  <tr
+                    key={school.schoolId}
+                    className="border-b hover:bg-gray-50"
+                  >
+                    <td className="p-2">{idx + 1}</td>
+                    <td className="p-2">{school.schoolName}</td>
+                    <td className="p-2">{school.schoolAddress}</td>
+                    <td className="p-2">{school.contactNumber}</td>
+                    {/* ✅ CHANGED: show template upload status */}
+                    <td className="p-2">
+                      {school.cardTemplateFront ? (
+                        <span className="text-green-600 text-xs font-medium">
+                          ✅ Uploaded
+                        </span>
+                      ) : (
+                        <span className="text-amber-500 text-xs">
+                          ⚠ No Template
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-2 flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => viewSchoolCard(school)}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => editSchool(school)}
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => deleteSchool(school.schoolId)}
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
 
@@ -306,62 +329,123 @@ const formatImage = (img: string) => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 max-h-[80vh] overflow-y-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>School Name</Label>
                 <Input
                   value={schoolForm.schoolName}
-                  onChange={(e) => setSchoolForm({ ...schoolForm, schoolName: e.target.value })}
+                  onChange={(e) =>
+                    setSchoolForm({ ...schoolForm, schoolName: e.target.value })
+                  }
                 />
               </div>
               <div>
                 <Label>Address</Label>
                 <Input
                   value={schoolForm.schoolAddress}
-                  onChange={(e) => setSchoolForm({ ...schoolForm, schoolAddress: e.target.value })}
+                  onChange={(e) =>
+                    setSchoolForm({
+                      ...schoolForm,
+                      schoolAddress: e.target.value,
+                    })
+                  }
                 />
               </div>
               <div>
                 <Label>Contact Person</Label>
                 <Input
                   value={schoolForm.contactPerson}
-                  onChange={(e) => setSchoolForm({ ...schoolForm, contactPerson: e.target.value })}
+                  onChange={(e) =>
+                    setSchoolForm({
+                      ...schoolForm,
+                      contactPerson: e.target.value,
+                    })
+                  }
                 />
               </div>
               <div>
                 <Label>Contact Number</Label>
                 <Input
                   value={schoolForm.contactNumber}
-                  onChange={(e) => setSchoolForm({ ...schoolForm, contactNumber: e.target.value })}
+                  onChange={(e) =>
+                    setSchoolForm({
+                      ...schoolForm,
+                      contactNumber: e.target.value,
+                    })
+                  }
                 />
               </div>
 
               {/* ✅ CHANGED: replaced single logo upload with 4 upload boxes */}
+             {/* Orientation toggle — display only, helps user choose template shape */}
+              <div className="md:col-span-2">
+                <Label>Card Orientation</Label>
+                <div className="flex gap-4 mt-1">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="cardOrientation"
+                      checked={cardOrientation === "portrait"}
+                      onChange={() => setCardOrientation("portrait")}
+                    />
+                    Portrait
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="cardOrientation"
+                      checked={cardOrientation === "landscape"}
+                      onChange={() => setCardOrientation("landscape")}
+                    />
+                    Landscape
+                  </label>
+                </div>
+              </div>
+
+              {/* Upload boxes — click box to upload, light grey bg so white templates stay visible */}
               <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
                 {[
                   { label: "School Logo", field: "schoolLogo" },
-                  { label: "ID Card Front Template", field: "cardTemplateFront" },
+                  {
+                    label: "ID Card Front Template",
+                    field: "cardTemplateFront",
+                  },
                   { label: "ID Card Back Template", field: "cardTemplateBack" },
                   { label: "Principal Signature", field: "principalSignature" },
                 ].map(({ label, field }) => (
                   <div key={field} className="flex flex-col gap-2">
                     <Label>{label}</Label>
-                    <div className="w-full h-28 rounded border flex items-center justify-center overflow-hidden bg-gray-100">
-                      {/* {schoolForm[field]
-                        ? <img src={schoolForm[field]} alt={label} className="w-full h-full object-contain" /> */}
-                        {schoolForm[field]
-                          ? <img src={imgUrl(schoolForm[field])} alt={label} className="w-full h-full object-contain" />
-                        : <Upload className="w-6 h-6 text-gray-400" />}
-                    </div>
-                    <Input
+                    <label
+                      htmlFor={`upload-${field}`}
+                      className="w-full h-28 rounded border flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                      style={{ backgroundColor: "#d1d5db" }}
+                    >
+                      {schoolForm[field] ? (
+                        <img
+                          src={
+                            schoolForm[field]?.startsWith("blob:") ||
+                            schoolForm[field]?.startsWith("data:")
+                              ? schoolForm[field]
+                              : imgUrl(schoolForm[field])
+                          }
+                          alt={label}
+                          className="w-full h-full object-contain"
+                          key={schoolForm[field]}
+                        />
+                      ) : (
+                        <Upload className="w-6 h-6 text-gray-500" />
+                      )}
+                    </label>
+                    <input
+                      id={`upload-${field}`}
                       type="file"
                       accept="image/*"
+                      className="hidden"
                       onChange={(e) => handleFileToBase64(e, field)}
                     />
                   </div>
                 ))}
               </div>
-
             </div>
             <div className="flex gap-2 mt-2 justify-end">
               <Button onClick={saveSchool}>
@@ -382,18 +466,24 @@ const formatImage = (img: string) => {
             <CardTitle>Add Academic Year</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>Select School</Label>
                 <Select
                   value={yearForm.schoolId}
-                  onValueChange={(value) => setYearForm({ ...yearForm, schoolId: value })}>
+                  onValueChange={(value) =>
+                    setYearForm({ ...yearForm, schoolId: value })
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select School" />
                   </SelectTrigger>
                   <SelectContent>
                     {schools.map((school) => (
-                      <SelectItem key={school.schoolId} value={school.schoolId.toString()}>
+                      <SelectItem
+                        key={school.schoolId}
+                        value={school.schoolId.toString()}
+                      >
                         {school.schoolName}
                       </SelectItem>
                     ))}
@@ -405,121 +495,135 @@ const formatImage = (img: string) => {
                 <Input
                   placeholder="2024-2025"
                   value={yearForm.academicYear}
-                  onChange={(e) => setYearForm({ ...yearForm, academicYear: e.target.value })}
+                  onChange={(e) =>
+                    setYearForm({ ...yearForm, academicYear: e.target.value })
+                  }
                 />
               </div>
             </div>
             <div className="flex gap-2 mt-2 justify-end">
               <Button onClick={saveYear}>Save</Button>
-              <Button variant="outline" onClick={() => setShowAddYear(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setShowAddYear(false)}>
+                Cancel
+              </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* View School Card Modal */}
-     {viewSchool && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-    <Card className="w-full max-w-md shadow-xl rounded-xl overflow-hidden bg-white max-h-[90vh] overflow-y-auto">
-      
-      <div className="flex justify-center mt-6">
-        <div className="w-28 h-28 rounded-full border-2 border-gray-200 overflow-hidden">
-          {viewSchool.schoolLogo ? (
-            <img
-              // src={
-              //   viewSchool.schoolLogo?.startsWith("data:image")
-              //     ? viewSchool.schoolLogo
-              //     : `data:image/png;base64,${viewSchool.schoolLogo}`
-              // }
-              src={imgUrl(viewSchool.schoolLogo)}
-              alt="School Logo"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <Upload className="w-12 h-12 text-gray-400 m-auto" />
-          )}
-        </div>
-      </div>
-
-      <CardContent className="p-6 space-y-4 text-gray-700">
-        <h2 className="text-2xl font-bold text-center">{viewSchool.schoolName}</h2>
-
-        <div className="space-y-2">
-          <div><span className="font-semibold">Address: </span>{viewSchool.schoolAddress}</div>
-          <div><span className="font-semibold">Contact Person: </span>{viewSchool.contactPerson}</div>
-          <div><span className="font-semibold">Contact Number: </span>{viewSchool.contactNumber}</div>
-        </div>
-
-        {/* Templates */}
-        {(viewSchool.cardTemplateFront || viewSchool.cardTemplateBack) && (
-          <div className="space-y-3 pt-2 border-t">
-            <p className="font-semibold text-sm">ID Card Templates</p>
-
-            <div className="grid grid-cols-2 gap-3">
-              
-              {viewSchool.cardTemplateFront && (
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Front</p>
+      {viewSchool && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <Card className="w-full max-w-md shadow-xl rounded-xl overflow-hidden bg-white max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-center mt-6">
+              <div className="w-28 h-28 rounded-full border-2 border-gray-200 overflow-hidden">
+                {viewSchool.schoolLogo ? (
                   <img
                     // src={
-                    //   viewSchool.cardTemplateFront?.startsWith("data:image")
-                    //     ? viewSchool.cardTemplateFront
-                    //     : `data:image/png;base64,${viewSchool.cardTemplateFront}`
+                    //   viewSchool.schoolLogo?.startsWith("data:image")
+                    //     ? viewSchool.schoolLogo
+                    //     : `data:image/png;base64,${viewSchool.schoolLogo}`
                     // }
-                    src={imgUrl(viewSchool.cardTemplateFront)}
-                    className="w-full rounded border"
-                    alt="Front Template"
+                    src={imgUrl(viewSchool.schoolLogo)}
+                    alt="School Logo"
+                    className="w-full h-full object-cover"
                   />
-                </div>
-              )}
-
-              {viewSchool.cardTemplateBack && (
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Back</p>
-                  <img
-                    // src={
-                    //   viewSchool.cardTemplateBack?.startsWith("data:image")
-                    //     ? viewSchool.cardTemplateBack
-                    //     : `data:image/png;base64,${viewSchool.cardTemplateBack}`
-                    // }
-                    src={imgUrl(viewSchool.cardTemplateBack)}
-                    className="w-full rounded border"
-                    alt="Back Template"
-                  />
-                </div>
-              )}
-
+                ) : (
+                  <Upload className="w-12 h-12 text-gray-400 m-auto" />
+                )}
+              </div>
             </div>
-          </div>
-        )}
 
-        {/* Principal Signature */}
-        {viewSchool.principalSignature && (
-          <div className="pt-2 border-t">
-            <p className="font-semibold text-sm mb-2">Principal Signature</p>
-            <img
-              // src={
-              //   viewSchool.principalSignature?.startsWith("data:image")
-              //     ? viewSchool.principalSignature
-              //     : `data:image/png;base64,${viewSchool.principalSignature}`
-              // }
-              src={imgUrl(viewSchool.principalSignature)}
-              className="h-16 object-contain"
-              alt="Principal Signature"
-            />
-          </div>
-        )}
-      </CardContent>
+            <CardContent className="p-6 space-y-4 text-gray-700">
+              <h2 className="text-2xl font-bold text-center">
+                {viewSchool.schoolName}
+              </h2>
 
-      <div className="p-4 flex justify-center border-t">
-        <Button variant="outline" onClick={() => setViewSchool(null)}>
-          Close
-        </Button>
-      </div>
+              <div className="space-y-2">
+                <div>
+                  <span className="font-semibold">Address: </span>
+                  {viewSchool.schoolAddress}
+                </div>
+                <div>
+                  <span className="font-semibold">Contact Person: </span>
+                  {viewSchool.contactPerson}
+                </div>
+                <div>
+                  <span className="font-semibold">Contact Number: </span>
+                  {viewSchool.contactNumber}
+                </div>
+              </div>
 
-    </Card>
-  </div>
-)}
+              {/* Templates */}
+              {(viewSchool.cardTemplateFront ||
+                viewSchool.cardTemplateBack) && (
+                <div className="space-y-3 pt-2 border-t">
+                  <p className="font-semibold text-sm">ID Card Templates</p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {viewSchool.cardTemplateFront && (
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1">Front</p>
+                        <img
+                          // src={
+                          //   viewSchool.cardTemplateFront?.startsWith("data:image")
+                          //     ? viewSchool.cardTemplateFront
+                          //     : `data:image/png;base64,${viewSchool.cardTemplateFront}`
+                          // }
+                          src={imgUrl(viewSchool.cardTemplateFront)}
+                          className="w-full rounded border"
+                          alt="Front Template"
+                        />
+                      </div>
+                    )}
+
+                    {viewSchool.cardTemplateBack && (
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1">Back</p>
+                        <img
+                          // src={
+                          //   viewSchool.cardTemplateBack?.startsWith("data:image")
+                          //     ? viewSchool.cardTemplateBack
+                          //     : `data:image/png;base64,${viewSchool.cardTemplateBack}`
+                          // }
+                          src={imgUrl(viewSchool.cardTemplateBack)}
+                          className="w-full rounded border"
+                          alt="Back Template"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Principal Signature */}
+              {viewSchool.principalSignature && (
+                <div className="pt-2 border-t">
+                  <p className="font-semibold text-sm mb-2">
+                    Principal Signature
+                  </p>
+                  <img
+                    // src={
+                    //   viewSchool.principalSignature?.startsWith("data:image")
+                    //     ? viewSchool.principalSignature
+                    //     : `data:image/png;base64,${viewSchool.principalSignature}`
+                    // }
+                    src={imgUrl(viewSchool.principalSignature)}
+                    className="h-16 object-contain"
+                    alt="Principal Signature"
+                  />
+                </div>
+              )}
+            </CardContent>
+
+            <div className="p-4 flex justify-center border-t">
+              <Button variant="outline" onClick={() => setViewSchool(null)}>
+                Close
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

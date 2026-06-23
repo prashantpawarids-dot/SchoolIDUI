@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/common/page-header";
 import {
@@ -22,10 +22,9 @@ import {
   SelectValue,
   
 } from "@/components/ui/select";
-import { ArrowLeft, Upload, CheckCircle, Camera, FileText, Cake, Home } from "lucide-react";
+import { ArrowLeft, Upload, CheckCircle, Camera } from "lucide-react";
 import Link from "next/link";
-import Cropper from "react-easy-crop";
-import getCroppedImg from "@/utils/cropImage";
+import ReactCrop, { centerCrop, makeAspectCrop, type Crop, type PixelCrop } from "react-image-crop";
 
 export default function AddStudentPage() {
   const router = useRouter();
@@ -34,15 +33,20 @@ export default function AddStudentPage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showCropper, setShowCropper] = useState(false);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+  const [crop, setCrop] = useState<Crop>();
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+  const [imgSrc, setImgSrc] = useState("");
+  const imgRef = useRef<HTMLImageElement>(null);
 
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [divisions, setDivisions] = useState<any[]>([]);
   const [schoolName, setSchoolName] = useState("");
   const [schoolLogo, setSchoolLogo] = useState("");
+  const [schoolCardTemplate, setSchoolCardTemplate] = useState("");
+  const [schoolCardTemplateBack, setSchoolCardTemplateBack] = useState("");
+  const [schoolSignature, setSchoolSignature] = useState("");
+  const [templateFields, setTemplateFields] = useState<{ front: any[]; back: any[] }>({ front: [], back: [] });
   
   const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
   // const BASE_URL = "/api/proxy";
@@ -89,8 +93,20 @@ export default function AddStudentPage() {
       );
       if (school) {
         setSchoolName(school.schoolName);
-        // setSchoolLogo(`data:image/jpeg;base64,${school.schoolLogo}`);
         setSchoolLogo(imgUrl(school.schoolLogo));
+        setSchoolCardTemplate(school.cardTemplateFront || "");
+        setSchoolCardTemplateBack(school.cardTemplateBack || "");
+        setSchoolSignature(school.principalSignature || "");
+
+        // Load saved designer field positions
+        try {
+          const tRes = await fetch(`${BASE_URL}/CardTemplate/list?schoolId=${school.schoolId}`);
+          const tData = await tRes.json();
+          if (tData?.length > 0 && tData[0].templateFieldsJson) {
+            const parsed = JSON.parse(tData[0].templateFieldsJson);
+            if (parsed?.front) setTemplateFields({ front: parsed.front, back: parsed.back || [] });
+          }
+        } catch {}
       }
     };
 
@@ -123,10 +139,24 @@ export default function AddStudentPage() {
 
   const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
+    if (!file) return;
+    setSelectedFile(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImgSrc(reader.result?.toString() ?? "");
       setShowCropper(true);
-    }
+      setCrop(undefined);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth: width, naturalHeight: height } = e.currentTarget;
+    const c = centerCrop(
+      makeAspectCrop({ unit: "%", width: 80 }, 4 / 5, width, height),
+      width, height
+    );
+    setCrop(c);
   };
 
   const onCapture = async () => {
@@ -150,140 +180,98 @@ export default function AddStudentPage() {
     setSelectedFile(null);
   };
 
-  const onCropComplete = useCallback(
-    (croppedArea: any, croppedAreaPixels: any) => {
-      setCroppedAreaPixels(croppedAreaPixels);
-    },
-    []
-  );
-
-  const showCroppedImage = useCallback(async () => {
-    if (!selectedFile && !photoPreview) return;
-
-    const imageSrc = selectedFile
-      ? URL.createObjectURL(selectedFile)
-      : photoPreview;
-    const croppedImage = await getCroppedImg(imageSrc!, croppedAreaPixels);
-    setPhotoPreview(croppedImage);
+  const showCroppedImage = async () => {
+    if (!completedCrop || !imgRef.current) return;
+    const canvas = document.createElement("canvas");
+    const scaleX = imgRef.current.naturalWidth  / imgRef.current.width;
+    const scaleY = imgRef.current.naturalHeight / imgRef.current.height;
+    canvas.width  = completedCrop.width;
+    canvas.height = completedCrop.height;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(
+      imgRef.current,
+      completedCrop.x * scaleX, completedCrop.y * scaleY,
+      completedCrop.width * scaleX, completedCrop.height * scaleY,
+      0, 0, completedCrop.width, completedCrop.height
+    );
+    const base64 = canvas.toDataURL("image/jpeg", 0.95);
+    setPhotoPreview(base64);
     setShowCropper(false);
     setSelectedFile(null);
-  }, [selectedFile, croppedAreaPixels, photoPreview]);
-
-  // const handleSubmit = async (e: React.FormEvent) => {
-  //   e.preventDefault();
-  //   setIsSubmitting(true);
-
-  //   const parentUserId = Number(localStorage.getItem("userId"));
-  //   const schoolId = Number(localStorage.getItem("schoolId"));
-
-  //   const base64Photo = photoPreview ? photoPreview.split(",")[1] : "";
-
-  //   const payload = {
-  //     parentUserId,
-  //     schoolId,
-  //     academicYearId: Number(formData.academicYearId),
-  //     classId: Number(formData.classId),
-  //     divisionId: Number(formData.divisionId),
-  //     firstName: formData.firstName,
-  //     middleName: formData.middleName,
-  //     lastName: formData.lastName,
-  //     rollNo: formData.rollNo,
-  //     dob: formData.dob,
-  //     bloodGroup: formData.bloodGroup,
-  //     address: formData.address,
-  //     photoPath: base64Photo,
-  //   };
-
-  //   try {
-  //     const res = await fetch(
-  //       `${process.env.NEXT_PUBLIC_API_BASE_URL}/Student/add`,
-  //       {
-  //         method: "POST",
-  //         headers: { "Content-Type": "application/json" },
-  //         body: JSON.stringify(payload),
-  //       }
-  //     );
-
-  //     if (!res.ok) throw new Error("Failed to submit");
-  //     setIsSuccess(true);
-  //     setTimeout(() => router.push("/parent/dashboard"), 2000);
-  //   } catch (err: any) {
-  //     console.error(err);
-  //     alert(err.message || "Something went wrong");
-  //   } finally {
-  //     setIsSubmitting(false);
-  //   }
-  // };
-
+    setImgSrc("");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setIsSubmitting(true);
+    e.preventDefault();
+    setIsSubmitting(true);
 
-  try {
-    const parentUserId = Number(localStorage.getItem("userId"));
-    const schoolId     = Number(localStorage.getItem("schoolId"));
+    try {
+      const parentUserId = Number(localStorage.getItem("userId"));
+      const schoolId     = Number(localStorage.getItem("schoolId"));
 
-    // ✅ Step 1 — upload photo to server, get URL
-    let photoPath = "";
-    if (photoPreview) {
-      // Convert base64 preview to File blob
-      const res      = await fetch(photoPreview);
-      const blob     = await res.blob();
-      const file     = new File([blob], "student-photo.jpg", { type: "image/jpeg" });
-      const formData = new FormData();
-      formData.append("file", file);
+      // ✅ Step 1 — upload photo to server, get URL
+      let photoPath = "";
+      if (photoPreview) {
+        // Convert base64 preview to File blob
+        const res      = await fetch(photoPreview);
+        const blob     = await res.blob();
+        const file     = new File([blob], "student-photo.jpg", { type: "image/jpeg" });
+        const formData = new FormData();
+        formData.append("file", file);
 
-      const uploadRes  = await fetch(
-        `${BASE_URL}/File/upload/students`,
-        { method: "POST", body: formData }
-      );
-      const uploadData = await uploadRes.json();
+        const uploadRes  = await fetch(
+          `${BASE_URL}/File/upload/students`,
+          { method: "POST", body: formData }
+        );
+        const uploadData = await uploadRes.json();
 
-      if (!uploadData.success) {
-        alert("Photo upload failed: " + uploadData.message);
-        setIsSubmitting(false);
-        return;
+        if (!uploadData.success) {
+          alert("Photo upload failed: " + uploadData.message);
+          setIsSubmitting(false);
+          return;
+        }
+
+        photoPath = uploadData.url; // e.g. /uploads/students/abc.jpg
       }
 
-      photoPath = uploadData.url; // e.g. /uploads/students/abc.jpg
+      // ✅ Step 2 — save student with photo URL (not base64)
+      const payload = {
+        parentUserId,
+        schoolId,
+        academicYearId: Number(formData.academicYearId),
+        classId:        Number(formData.classId),
+        divisionId:     Number(formData.divisionId),
+        firstName:      formData.firstName,
+        middleName:     formData.middleName,
+        lastName:       formData.lastName,
+        rollNo:         formData.rollNo,
+        dob:            formData.dob,
+        bloodGroup:     formData.bloodGroup,
+        address:        formData.address,
+        photoPath,  // ← URL now, not base64
+      };
+
+      const submitRes = await fetch(`${BASE_URL}/Student/add`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(payload),
+      });
+
+      if (!submitRes.ok) {
+        const errText = await submitRes.text();
+        throw new Error(errText || "Failed to submit");
+      }
+
+      setIsSuccess(true);
+      setTimeout(() => router.push("/parent/dashboard"), 2000);
+
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Something went wrong");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // ✅ Step 2 — save student with photo URL (not base64)
-    const payload = {
-      parentUserId,
-      schoolId,
-      academicYearId: Number(formData.academicYearId),
-      classId:        Number(formData.classId),
-      divisionId:     Number(formData.divisionId),
-      firstName:      formData.firstName,
-      middleName:     formData.middleName,
-      lastName:       formData.lastName,
-      rollNo:         formData.rollNo,
-      dob:            formData.dob,
-      bloodGroup:     formData.bloodGroup,
-      address:        formData.address,
-      photoPath,  // ← URL now, not base64
-    };
-
-    const submitRes = await fetch(`${BASE_URL}/Student/add`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify(payload),
-    });
-
-    if (!submitRes.ok) throw new Error("Failed to submit");
-
-    setIsSuccess(true);
-    setTimeout(() => router.push("/parent/dashboard"), 2000);
-
-  } catch (err: any) {
-    console.error(err);
-    alert(err.message || "Something went wrong");
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   if (isSuccess) {
     return (
@@ -372,7 +360,7 @@ export default function AddStudentPage() {
 
                   {/* Student Names */}
                   <div className="flex-1 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>
                           First Name <span className="text-red-500">*</span>
@@ -426,27 +414,37 @@ export default function AddStudentPage() {
                 </div>
 
                 {/* Cropper Modal */}
-                {showCropper && (
-                  <div className="fixed inset-0 z-50 bg-black/70 flex flex-col items-center justify-center p-4">
-                    <div className="relative w-full max-w-lg h-96 bg-white rounded-lg overflow-hidden">
-                      <Cropper
-                        image={
-                          selectedFile
-                            ? URL.createObjectURL(selectedFile)
-                            : photoPreview!
-                        }
-                        crop={crop}
-                        zoom={zoom}
-                        aspect={4 / 5}
-                        onCropChange={setCrop}
-                        onZoomChange={setZoom}
-                        onCropComplete={onCropComplete}
-                      />
-                      <div className="absolute bottom-4 left-0 w-full flex justify-center gap-2">
-                        <Button onClick={showCroppedImage}>Save Crop</Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => setShowCropper(false)}>
+                {showCropper && imgSrc && (
+                  <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl p-4 w-full max-w-2xl">
+                      <h3 className="text-base font-semibold mb-3 text-center">
+                        ✂️ Crop Photo — drag corners to resize
+                      </h3>
+                      <div className="flex justify-center overflow-auto max-h-[65vh]">
+                        <ReactCrop
+                          crop={crop}
+                          onChange={c => setCrop(c)}
+                          onComplete={c => setCompletedCrop(c)}
+                          aspect={4 / 5}
+                          minWidth={50}
+                          minHeight={50}
+                        >
+                          <img
+                            ref={imgRef}
+                            src={imgSrc}
+                            onLoad={onImageLoad}
+                            style={{ maxWidth: "100%", maxHeight: "60vh" }}
+                            alt="crop-source"
+                          />
+                        </ReactCrop>
+                      </div>
+                      <div className="flex gap-3 mt-4 justify-center">
+                        <Button type="button" onClick={showCroppedImage}
+                          className="bg-green-600 hover:bg-green-700 px-6">
+                          ✅ Save Crop
+                        </Button>
+                        <Button type="button" variant="outline"
+                          onClick={() => { setShowCropper(false); setImgSrc(""); }}>
                           Cancel
                         </Button>
                       </div>
@@ -458,7 +456,7 @@ export default function AddStudentPage() {
                 <CardHeader>
                   <CardTitle>Personal Details</CardTitle>
                 </CardHeader>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label className="flex items-center gap-1 justify-start">
                       Date of Birth <span className="text-red-500">*</span>
@@ -520,7 +518,7 @@ export default function AddStudentPage() {
                 <CardHeader>
                   <CardTitle>Educational Details</CardTitle>
                 </CardHeader>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {/* Academic Year */}
                   <div className="space-y-2 w-full">
                     <Label className="flex items-center gap-1 justify-start">
@@ -659,133 +657,71 @@ export default function AddStudentPage() {
 
         {/* ID Card Preview Section - Takes 1 column */}
         <div className="lg:col-span-1">
-          <div className="sticky top-6 space-y-4">
-            <h3 className="text-lg font-semibold">ID Card Preview</h3>
-            
-            {/* Front Side */}
-            <div className="relative w-full aspect-[3/4] bg-gradient-to-br from-green-600 to-green-700 rounded-lg shadow-xl overflow-hidden">
-              {/* Decorative background pattern */}
-              <div className="absolute inset-0 opacity-20">
-                <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-green-400 to-transparent"></div>
-                <div className="absolute bottom-0 right-0 w-48 h-48 bg-green-800 rounded-tl-full"></div>
-              </div>
+          <div className="sticky top-6 space-y-3">
+            <h3 className="text-base font-semibold">ID Card Preview</h3>
 
-              {/* Content */}
-              <div className="relative z-10 h-full flex flex-col p-4">
-                {/* Header with logo and school name */}
-                <div className="flex items-center gap-2 mb-4">
-                  {schoolLogo && (
-                    <img
-                      src={schoolLogo}
-                      alt="School Logo"
-                      className="w-10 h-10 rounded-full bg-white p-1"
-                    />
-                  )}
-                  <div className="flex-1">
-                    <h2 className="text-white font-bold text-sm leading-tight uppercase">
-                      {schoolName || "SCHOOL NAME"}
-                    </h2>
-                  </div>
-                </div>
-
-                {/* Student Photo */}
-                <div className="flex justify-center mb-3">
-                  <div className="w-24 h-24 rounded-full border-4 border-white overflow-hidden bg-white">
-                    {photoPreview ? (
-                      <img
-                        src={photoPreview}
-                        alt="Student"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                        <Upload className="w-8 h-8 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Student Name */}
-                <div className="text-center mb-4">
-                  <h3 className="text-white font-bold text-base">
-                    {fullName || "Student Name"}
-                  </h3>
-                  <p className="text-white text-xs">
-                    {selectedClassName && selectedDivisionName
-                      ? `Std. ${selectedClassName} | Class: ${selectedDivisionName}`
-                      : "Class & Division"}
-                  </p>
-                </div>
-
-                {/* Info Icons */}
-                <div className="space-y-2 text-white text-xs flex-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                      <FileText className="w-3 h-3" />
-                    </div>
-                    <span>{formData.rollNo || "2269"}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                      <Cake className="w-3 h-3" />
-                    </div>
-                    <span>
-                      {formData.dob
-                        ? new Date(formData.dob).toLocaleDateString("en-GB", {
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                          })
-                        : "10th July 2005"}
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                      <Home className="w-3 h-3" />
-                    </div>
-                    <span className="flex-1 line-clamp-2">
-                      {formData.address || "Shreeram Aprt.,1105, SV Road, Ashoknagar"}
-                    </span>
+            <div className="flex gap-3 justify-center">
+              {/* FRONT */}
+              <div className="flex-1 max-w-[48%]">
+                <p className="text-xs text-center text-gray-400 mb-1 font-medium">◼ Front</p>
+                <div className="relative rounded-lg overflow-hidden shadow-md" style={{ paddingTop: "158%" }}>
+                  <div className="absolute inset-0">
+                    {schoolCardTemplate
+                      ? <img src={imgUrl(schoolCardTemplate)} className="absolute inset-0 w-full h-full object-cover" alt="front" />
+                      : <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-blue-800" />
+                    }
+                    {templateFields.front.filter((f: any) => f.visible).map((f: any) => {
+                      const dobFmt = formData.dob
+                        ? new Date(formData.dob).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                        : "";
+                      if (f.isImage) {
+                        let src = "";
+                        if (f.key === "photo")      src = photoPreview || "";
+                        if (f.key === "schoolLogo") src = schoolLogo;
+                        if (!src) return null;
+                        return <img key={f.key} src={src} style={{ position: "absolute", left: `${f.x}%`, top: `${f.y}%`, width: `${f.width}%`, height: `${f.height}%`, objectFit: "cover", zIndex: 1 }} alt="" />;
+                      }
+                      let val = "";
+                      if (f.key === "studentName")   val = fullName;
+                      if (f.key === "classDivision") val = `${selectedClassName} - ${selectedDivisionName}`;
+                      if (f.key === "rollNo")        val = `Roll: ${formData.rollNo}`;
+                      if (f.key === "dob")           val = `DOB: ${dobFmt}`;
+                      if (f.key === "bloodGroup")    val = formData.bloodGroup;
+                      if (f.key === "address")       val = formData.address;
+                      if (!val) return null;
+                      const jMap: any = { left: "flex-start", center: "center", right: "flex-end" };
+                      return <div key={f.key} style={{ position: "absolute", left: `${f.x}%`, top: `${f.y}%`, width: `${f.width}%`, height: `${f.height}%`, zIndex: 1, fontSize: f.fontSize, color: f.fontColor || "#000", fontWeight: f.bold ? "bold" : "normal", fontStyle: f.italic ? "italic" : "normal", whiteSpace: "nowrap", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: jMap[f.align || "left"] }}>{val}</div>;
+                    })}
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Back Side */}
-            <div className="relative w-full aspect-[3/4] bg-gradient-to-br from-green-600 to-green-700 rounded-lg shadow-xl overflow-hidden">
-              {/* Decorative background pattern */}
-              <div className="absolute inset-0 opacity-20">
-                <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-green-400 to-transparent"></div>
-                <div className="absolute bottom-0 left-0 w-full h-48 bg-gradient-to-t from-green-800 to-transparent"></div>
-              </div>
-
-              {/* Content */}
-              <div className="relative z-10 h-full flex flex-col items-center justify-center p-6">
-                {/* School Logo and Name */}
-                <div className="text-center mb-8">
-                  {schoolLogo && (
-                    <img
-                      src={schoolLogo}
-                      alt="School Logo"
-                      className="w-16 h-16 mx-auto rounded-full bg-white p-2 mb-3"
-                    />
-                  )}
-                  <h2 className="text-white font-bold text-lg uppercase">
-                    {schoolName || "RISE ABOVE"}
-                  </h2>
-                  <p className="text-white text-xs">INTERNATIONAL SCHOOL</p>
-                </div>
-
-                {/* Icon buttons */}
-                <div className="space-y-4">
-                  <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-                    <FileText className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-                    <Cake className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-                    <Home className="w-6 h-6 text-white" />
+              {/* BACK */}
+              <div className="flex-1 max-w-[48%]">
+                <p className="text-xs text-center text-gray-400 mb-1 font-medium">◻ Back</p>
+                <div className="relative rounded-lg overflow-hidden shadow-md" style={{ paddingTop: "158%" }}>
+                  <div className="absolute inset-0">
+                    {schoolCardTemplateBack
+                      ? <img src={imgUrl(schoolCardTemplateBack)} className="absolute inset-0 w-full h-full object-cover" alt="back" />
+                      : <div className="absolute inset-0 bg-gradient-to-br from-slate-200 to-slate-300" />
+                    }
+                    {templateFields.back.filter((f: any) => f.visible).map((f: any) => {
+                      if (f.isImage) {
+                        let src = "";
+                        if (f.key === "schoolLogo") src = schoolLogo;
+                        if (f.key === "signature")  src = imgUrl(schoolSignature);
+                        if (f.key === "photo")      src = photoPreview || "";
+                        if (!src) return null;
+                        return <img key={f.key} src={src} style={{ position: "absolute", left: `${f.x}%`, top: `${f.y}%`, width: `${f.width}%`, height: `${f.height}%`, objectFit: "cover", zIndex: 1 }} alt="" />;
+                      }
+                      let val = "";
+                      if (f.key === "studentName")   val = fullName;
+                      if (f.key === "classDivision") val = `${selectedClassName} - ${selectedDivisionName}`;
+                      if (f.key === "address")       val = formData.address;
+                      if (!val) return null;
+                      const jMap: any = { left: "flex-start", center: "center", right: "flex-end" };
+                      return <div key={f.key} style={{ position: "absolute", left: `${f.x}%`, top: `${f.y}%`, width: `${f.width}%`, height: `${f.height}%`, zIndex: 1, fontSize: f.fontSize, color: f.fontColor || "#000", fontWeight: f.bold ? "bold" : "normal", fontStyle: f.italic ? "italic" : "normal", whiteSpace: "nowrap", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: jMap[f.align || "left"] }}>{val}</div>;
+                    })}
                   </div>
                 </div>
               </div>

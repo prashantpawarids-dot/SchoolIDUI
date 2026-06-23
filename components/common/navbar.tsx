@@ -10,16 +10,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bell, ChevronDown, LogOut, Settings, User } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Menu, Settings, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import LogoImage from "@/asset/logo2.jpeg"; // Default logo
 import Image from "next/image";
+import { imgUrl } from "@/lib/image-utils";
 
 interface NavbarProps {
   userRole?: string;
+  onMenuClick?: () => void;
 }
 
-export function Navbar({ userRole = "Admin" }: NavbarProps) {
+export function Navbar({ userRole = "Admin", onMenuClick }: NavbarProps) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false); // <--- Added
   const [userInitial, setUserInitial] = useState("U");
@@ -27,6 +29,7 @@ export function Navbar({ userRole = "Admin" }: NavbarProps) {
   const [userEmail, setUserEmail] = useState("");
   const [schoolName, setSchoolName] = useState("ID Card Management System");
   const [schoolLogo, setSchoolLogo] = useState<string | null>(null);
+  const [adminLogo, setAdminLogo] = useState<string | null>(null);
   const [roleId, setRoleId] = useState<number>(0);
   const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -90,6 +93,10 @@ const textUser = await resUser.text();
         if (school.schoolLogo) setSchoolLogo(`data:image/jpeg;base64,${school.schoolLogo}`);
       }
     }
+
+    if (roleIdNum === 1 && userData.adminLogo) {
+      setAdminLogo(imgUrl(userData.adminLogo));
+    }
   } catch (err) {
     console.error("Navbar fetch error:", err);
   }
@@ -122,18 +129,31 @@ const textUser = await resUser.text();
 
   return (
     <nav className="bg-card border-b border-border sticky top-0 z-50">
-      <div className="h-16 px-6 flex items-center justify-between">
+      <div className="min-h-[56px] md:h-16 px-3 md:px-6 flex items-center justify-between gap-2">
         {/* Logo / School */}
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-lg font-bold text-foreground">{schoolName}</h1>
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+          {onMenuClick && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onMenuClick}
+              className="lg:hidden shrink-0 min-h-[44px] min-w-[44px]"
+              aria-label="Open menu">
+              <Menu className="w-5 h-5" />
+            </Button>
+          )}
+          <div className="flex items-center gap-2 min-w-0">
+            {adminLogo && (
+              <img src={adminLogo} alt="Admin Logo" className="w-9 h-9 rounded-lg object-cover shrink-0" />
+            )}
+            <h1 className="text-base md:text-lg font-bold text-foreground truncate">{schoolName}</h1>
           </div>
         </div>
 
         {/* Right Side */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4 shrink-0">
           {/* Notifications */}
-          <Button variant="ghost" size="icon" className="relative">
+          <Button variant="ghost" size="icon" className="relative min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0">
             <Bell className="w-5 h-5 text-muted-foreground" />
             <span className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground text-[10px] rounded-full flex items-center justify-center">
               3
@@ -145,7 +165,7 @@ const textUser = await resUser.text();
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="flex items-center gap-2 h-10 px-3">
+                className="flex items-center gap-2 min-h-[44px] md:h-10 px-2 md:px-3">
                 <Avatar className="w-8 h-8">
                   <AvatarFallback
                     className={`${
